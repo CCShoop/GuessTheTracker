@@ -58,8 +58,8 @@ def tallyScores(PLAYERS):
     for player in decreasingPLAYERS:
         if player.score <= lowestRemainingPlayer.score:
             lowestRemainingPlayer = player
-            scoreboard.append(lowestRemainingPlayer)
-            decreasingPLAYERS.remove(player)
+        scoreboard.append(lowestRemainingPlayer)
+        decreasingPLAYERS.remove(player)
 
     placeCounter = 1
     for player in scoreboard:
@@ -139,7 +139,6 @@ async def register_command(interaction):
 
 @tree.command(name='deregister', description='Deregister for GuessTheGame tracking. WARNING: YOUR WINS WILL BE PERMANANTLY LOST!')
 async def deregister_command(interaction):
-    channel = client.get_channel(int(CHANNEL))
     removed = False
     for player in PLAYERS:
         if player.name == interaction.user.name.strip():
@@ -150,11 +149,11 @@ async def deregister_command(interaction):
             writeFile(replaceFileLines('PLAYERS', playersString))
             os.putenv('PLAYERS', playersString)
             print(f'Deregistered user {player.name}')
-            await channel.send(f'You have been deregistered for GuessTheGame tracking.')
+            await interaction.response.send_message('You have been deregistered for GuessTheGame tracking.')
             removed = True
     if not removed:
         print(f'Unregistered user {interaction.user.name.strip()} attempted to deregister')
-        await channel.send(f'You were already unregistered for GuessTheGame tracking.')
+        await interaction.response.send_message('You were already unregistered for GuessTheGame tracking.')
 
 
 @tasks.loop(hours=20)
@@ -230,6 +229,7 @@ async def on_message(message):
             if char == '🟥':
                 player.score += 1
             elif char == '🟩':
+                player.score += 1
                 break
         print(f'Player {player.name} got a score of {player.score}')
 
