@@ -82,14 +82,15 @@ def tallyScores(PLAYERS):
 load_dotenv()
 TOKEN = os.getenv('DISCORD_TOKEN')
 CHANNEL = os.getenv('TEXT_CHANNEL')
+isFirstCall = True
 PLAYERS = []
 class PLAYER_CLASS:
-    completed = False
-    success = False
     def __init__(self, name, wins, score):
         self.name = str(name)
         self.wins = int(wins)
         self.score = int(score)
+        self.completed = False
+        self.success = False
 
 
 for player in os.getenv('PLAYERS').split(PLAYER_DELIMITER):
@@ -155,10 +156,13 @@ async def deregister_command(interaction):
         await interaction.response.send_message('You were already unregistered for GuessTheGame tracking.')
 
 
-#@tasks.loop(hours=20)
-@tasks.loop(seconds=15)
+@tasks.loop(hours=20)
 async def midnight_call():
     if not PLAYERS:
+        return
+    global isFirstCall
+    if isFirstCall:
+        isFirstCall = False
         return
 
     channel = client.get_channel(int(CHANNEL))
