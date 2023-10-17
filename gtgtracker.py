@@ -1,38 +1,58 @@
 # Written by Cael Shoop
 
 import os
+import json
 import discord
 from discord import app_commands
 from discord.ext import tasks
 from dotenv import load_dotenv
 
-PLAYER_DELIMITER = ','
-NAME_DELIMITER = '_^'
-SCORE_DELIMITER = '%$'
-DEBUG = False
+JSON_EXT = '.json'
 
 def replaceFileLines(substr, newValue):
     newFileLines = []
-    with open('.env', 'r') as file:
-        for line in file.readlines():
-            if substr in line:
-                line = f'{substr}={newValue}'
-                print(f'Replacing {substr} value with {newValue}')
-            newFileLines.append(line)
+    file = open('.env', 'r')
+    for line in file.readlines():
+        if substr in line:
+            line = f'{substr}={newValue}'
+            print(f'Replacing {substr} value with {newValue}')
+        newFileLines.append(line)
+    file.close()
     return newFileLines
 
 
-def writeFile(newFileLines):
-    with open('.env', 'w') as file:
-        for line in newFileLines:
-            file.write(line)
+def writeEnvFile(newFileLines):
+    file = open('.env', 'w')
+    for line in newFileLines:
+        file.write(line)
+    file.close()
 
 
-def generatePlayersString(PLAYERS):
-    playersString = ''
+def readJsonFile(PLAYERS):
+    jsonFileName = str(SERVER_ID) + JSON_EXT
+    file = open(jsonFileName, 'r')
+    data = json.load(file)
+    PLAYERS = []
+    for name, playerData in data.items():
+        print(f'Loading player {name}')
+        newPlayer = PLAYER_CLASS(name, playerData['wins'], playerData['score'], playerData['completed'], playerData['success'])
+        print(f'Loaded player {newPlayer.name} - wins: {newPlayer.wins}, score: {newPlayer.score}, completed: {newPlayer.completed}, success: {newPlayer.success}')
+        PLAYERS.append(newPlayer)
+    file.close()
+    print(f'Successfully loaded {jsonFileName}')
+    return PLAYERS
+
+
+def writeJsonFile(PLAYERS):
+    jsonFileName = str(SERVER_ID) + JSON_EXT
+    file = open(jsonFileName, 'w+')
+    data = {}
     for player in PLAYERS:
-        playersString += f'{player.name}{NAME_DELIMITER}{player.wins}{SCORE_DELIMITER}{player.score}{PLAYER_DELIMITER}'
-    return playersString
+        data[player.name] = {'wins': player.wins, 'score': player.score, 'completed': player.completed, 'success': player.success}
+        print(f'{player.name} json data: {data[player.name]}')
+    jsonData = json.dumps(data)
+    file.write(jsonData)
+    file.close()
 
 
 def getScore(player):
@@ -47,34 +67,49 @@ def tallyScores(PLAYERS):
     print('Tallying scores')
     winners = []
     results = []
-    
-    PLAYERS.sort(key=getScore)
-    player = PLAYERS[0]
-    winners.append(player)
-    for iPlayer in PLAYERS[1:]:
-        if iPlayer.score == player.score:
-            winners.append(iPlayer)
-        else:
-            break
+    results.append('GUESSING COMPLETE!\n')
 
-    for winner in winners:
-        winner.wins += 1
+    PLAYERS.sort(key=getScore)
+    if PLAYERS[0].success:
+        firstWinner = PLAYERS[0]
+        winners.append(firstWinner)
+        for iPlayer in PLAYERS[1:]:
+            if iPlayer.score == firstWinner.score:
+                winners.append(iPlayer)
+            else:
+                break
 
     placeCounter = 1
     for player in PLAYERS:
         print(f'{placeCounter}. {player.name} ({player.wins} wins) with score of {player.score}')
         if player in winners:
-            results.append(f'{placeCounter}. {player.name} ({player.wins} wins) wins by guessing the game in {player.score} guesses!\n')
+            player.wins += 1
+            if player.wins == 1:
+                if player.score == 1:
+                    results.append(f'1. {player.name} (1 win) wins by guessing the game in ONE GUESS! NICE ONE!\n')
+                else:
+                    results.append(f'1. {player.name} (1 win) wins by guessing the game in {player.score} guesses!\n')
+            else:
+                if player.score == 1:
+                    results.append(f'1. {player.name} ({player.wins} wins) wins by guessing the game in ONE GUESS! NICE ONE!\n')
+                else:
+                    results.append(f'1. {player.name} ({player.wins} wins) wins by guessing the game in {player.score} guesses!\n')
         elif player.success:
-            placeCounter += 1
-            results.append(f'{placeCounter}. {player.name} ({player.wins} wins) guessed the game in {player.score} guesses.\n')
+            if player.wins == 1:
+                results.append(f'{placeCounter}. {player.name} (1 win) guessed the game in {player.score} guesses.\n')
+            else:
+                results.append(f'{placeCounter}. {player.name} ({player.wins} wins) guessed the game in {player.score} guesses.\n')
         else:
-            placeCounter += 1
-            results.append(f'{placeCounter}. {player.name} ({player.wins} wins) did not successfully guess the game.\n')
-
-    for player in PLAYERS:
+            if player.wins == 1:
+                results.append(f'{player.name} (1 win) did not successfully guess the game.\n')
+            else:
+                results.append(f'{player.name} ({player.wins} wins) did not successfully guess the game.\n')
+        placeCounter += 1
         player.score = 0
-        writeFile(replaceFileLines('PLAYERS', generatePlayersString(PLAYERS)))
+        player.completed = False
+        player.success = False
+
+    writeJsonFile(PLAYERS)
 
     return results
 
@@ -82,27 +117,16 @@ def tallyScores(PLAYERS):
 load_dotenv()
 TOKEN = os.getenv('DISCORD_TOKEN')
 CHANNEL = os.getenv('TEXT_CHANNEL')
+SERVER_ID = os.getenv('SERVER_ID')
 isFirstCall = True
 PLAYERS = []
 class PLAYER_CLASS:
-    def __init__(self, name, wins, score):
+    def __init__(self, name, wins, score, completed=False, success=False):
         self.name = str(name)
         self.wins = int(wins)
         self.score = int(score)
-        self.completed = False
-        self.success = False
-
-
-for player in os.getenv('PLAYERS').split(PLAYER_DELIMITER):
-    if player != ',' and player != '':
-        player = player.split(NAME_DELIMITER)
-        name = player[0]
-        scores = player[1].split(SCORE_DELIMITER)
-        wins = scores[0]
-        score = scores[1]
-        print(f'Loading player {name} with {wins} wins and score of {score}')
-        playerObj = PLAYER_CLASS(name, wins, score)
-        PLAYERS.append(playerObj)
+        self.completed = completed
+        self.success = success
 
 
 intents = discord.Intents.all()
@@ -113,11 +137,16 @@ tree = app_commands.CommandTree(client)
 # Slash Commands
 @tree.command(name='track', description='Track this text channel.')
 async def track_command(interaction):
-    CHANNEL = f'{interaction.channel.id}\n'
-    print(f'Now tracking channel {CHANNEL}', end='')
-    writeFile(replaceFileLines('TEXT_CHANNEL', CHANNEL))
-    os.putenv('TEXT_CHANNEL', CHANNEL)
-    await interaction.response.send_message('Now tracking this channel.')
+    global CHANNEL
+    if interaction.channel.id != int(CHANNEL):
+        CHANNEL = f'{interaction.channel.id}\n'
+        print(f'Now tracking channel {CHANNEL}', end='')
+        writeEnvFile(replaceFileLines('TEXT_CHANNEL', CHANNEL))
+        os.putenv('TEXT_CHANNEL', CHANNEL)
+        await interaction.response.send_message('Now tracking this channel.')
+    else:
+        print(f'Tried to change channel tracking to current channel')
+        await interaction.response.send_message('Already tracking this channel.')
 
 @tree.command(name='register', description='Register for GuessTheGame tracking.')
 async def register_command(interaction):
@@ -130,11 +159,7 @@ async def register_command(interaction):
     print(f'Registering user {interaction.user.name.strip()} for tracking')
     playerObj = PLAYER_CLASS(interaction.user.name.strip(), 0, 0)
     PLAYERS.append(playerObj)
-    playersString = ''
-    for player in PLAYERS:
-        playersString += f'{player.name}{NAME_DELIMITER}0{SCORE_DELIMITER}0{PLAYER_DELIMITER}'
-    writeFile(replaceFileLines('PLAYERS', playersString))
-    os.putenv('PLAYERS', playersString)
+    writeJsonFile(PLAYERS)
     await interaction.response.send_message('You have been registered for GuessTheGame tracking.')
 
 @tree.command(name='deregister', description='Deregister for GuessTheGame tracking. WARNING: YOUR WINS WILL BE PERMANANTLY LOST!')
@@ -143,11 +168,7 @@ async def deregister_command(interaction):
     for player in PLAYERS:
         if player.name == interaction.user.name.strip():
             PLAYERS.remove(player)
-            playersString = ''
-            for player in PLAYERS:
-                playersString += f'{player.name}{NAME_DELIMITER}0{SCORE_DELIMITER}0{PLAYER_DELIMITER}'
-            writeFile(replaceFileLines('PLAYERS', playersString))
-            os.putenv('PLAYERS', playersString)
+            writeJsonFile(PLAYERS)
             print(f'Deregistered user {player.name}')
             await interaction.response.send_message('You have been deregistered for GuessTheGame tracking.')
             removed = True
@@ -187,11 +208,10 @@ async def midnight_call():
 async def on_ready():
     print(f'{client.user} has connected to Discord!')
     await tree.sync()
+    global PLAYERS
+    PLAYERS = readJsonFile(PLAYERS)
     if not midnight_call.is_running():
         midnight_call.start()
-    if DEBUG:
-        channel = client.get_channel(int(CHANNEL))
-        await channel.send(f'{client.user} is now online')
 
 
 @client.event
@@ -222,7 +242,6 @@ async def on_message(message):
         found = False
         for iPlayer in PLAYERS:
             if message.author.name == iPlayer.name:
-                iPlayer.completed = True
                 found = True
                 player = iPlayer
             elif not iPlayer.completed:
@@ -234,8 +253,15 @@ async def on_message(message):
             return
         print(f'Received GTG message from {message.author}')
 
+        # player has already sent results
+        if player.completed:
+            await channel.send(f'{player.name}, you have already submitted your results today.')
+            print(f'{player.name} tried to resubmit results')
+            return
+
         result = message.content.splitlines()[2].replace(' ', '')[1:]
         print('Result line: ' + result)
+        player.completed = True
         player.score = 0
         for char in result:
             if char == '🟥':
@@ -246,14 +272,26 @@ async def on_message(message):
                 break
         print(f'Player {player.name} got a score of {player.score}')
 
-        writeFile(replaceFileLines('PLAYERS', generatePlayersString(PLAYERS)))
+        writeJsonFile(PLAYERS)
 
         if player.success:
             await message.add_reaction('👍')
-            await channel.send(f'{player.name} ({player.wins} wins) guessed the game in {player.score} guesses!\n')
+            if player.wins == 1:
+                if player.score == 1:
+                    await channel.send(f'{player.name} (1 win) guessed the game in 1 guess!\n')
+                else:
+                    await channel.send(f'{player.name} (1 win) guessed the game in {player.score} guesses!\n')
+            else:
+                if player.score == 1:
+                    await channel.send(f'{player.name} ({player.wins} wins) guessed the game in 1 guess!\n')
+                else:
+                    await channel.send(f'{player.name} ({player.wins} wins) guessed the game in {player.score} guesses!\n')
         else:
             await message.add_reaction('👎')
-            await channel.send(f'{player.name} ({player.wins} wins) did not successfully guess the game.\n')
+            if player.wins == 1:
+                await channel.send(f'{player.name} (1 win) did not successfully guess the game.\n')
+            else:
+                await channel.send(f'{player.name} ({player.wins} wins) did not successfully guess the game.\n')
 
         if unplayed == '':
             for score in tallyScores(PLAYERS):
