@@ -9,7 +9,7 @@ from dotenv import load_dotenv
 PLAYER_DELIMITER = ','
 NAME_DELIMITER = '_^'
 SCORE_DELIMITER = '%$'
-SCORED = False
+DEBUG = False
 
 def replaceFileLines(substr, newValue):
     newFileLines = []
@@ -35,48 +35,46 @@ def generatePlayersString(PLAYERS):
     return playersString
 
 
+def getScore(player):
+    return player.score
+
+
 def tallyScores(PLAYERS):
+    if not PLAYERS:
+        print('No players to score')
+        return
+    
     print('Tallying scores')
     winners = []
     results = []
-    scoreboard = []
-    decreasingPLAYERS = PLAYERS.copy()
-    lowestRemainingPlayer = decreasingPLAYERS[0]
-    winner = decreasingPLAYERS[0]
-
-    for player in decreasingPLAYERS:
-        if player.completed and player.score < winner.score:
-            winner = player
-    winners.append(winner)
-    for player in decreasingPLAYERS:
-        if player.completed and player.name != winner.name and player.score == winner.score:
-            winners.append(player)
+    
+    PLAYERS.sort(key=getScore)
+    player = PLAYERS[0]
+    winners.append(player)
+    for iPlayer in PLAYERS[1:]:
+        if iPlayer.score == player.score:
+            winners.append(iPlayer)
+        else:
+            break
 
     for winner in winners:
         winner.wins += 1
 
-    for player in decreasingPLAYERS:
-        if player.score <= lowestRemainingPlayer.score:
-            lowestRemainingPlayer = player
-            scoreboard.append(lowestRemainingPlayer)
-            decreasingPLAYERS.remove(player)
-
     placeCounter = 1
-    for player in scoreboard:
+    for player in PLAYERS:
         print(f'{placeCounter}. {player.name} ({player.wins}) with score of {player.score}')
         if player in winners:
             results.append(f'{placeCounter}. {player.name} ({player.wins}) wins by guessing the game in {player.score} guesses!\n')
-            placeCounter -= 1
-        elif player.score < 6:
+        elif player.success:
+            placeCounter += 1
             results.append(f'{placeCounter}. {player.name} ({player.wins}) guessed the game in {player.score} guesses.\n')
         else:
+            placeCounter += 1
             results.append(f'{placeCounter}. {player.name} ({player.wins}) did not successfully guess the game.\n')
-        placeCounter += 1
 
     for player in PLAYERS:
         player.score = 0
         writeFile(replaceFileLines('PLAYERS', generatePlayersString(PLAYERS)))
-    SCORED = True
 
     return results
 
@@ -87,6 +85,7 @@ CHANNEL = os.getenv('TEXT_CHANNEL')
 PLAYERS = []
 class PLAYER_CLASS:
     completed = False
+    success = False
     def __init__(self, name, wins, score):
         self.name = str(name)
         self.wins = int(wins)
@@ -139,7 +138,6 @@ async def register_command(interaction):
 
 @tree.command(name='deregister', description='Deregister for GuessTheGame tracking. WARNING: YOUR WINS WILL BE PERMANANTLY LOST!')
 async def deregister_command(interaction):
-    channel = client.get_channel(int(CHANNEL))
     removed = False
     for player in PLAYERS:
         if player.name == interaction.user.name.strip():
@@ -150,25 +148,29 @@ async def deregister_command(interaction):
             writeFile(replaceFileLines('PLAYERS', playersString))
             os.putenv('PLAYERS', playersString)
             print(f'Deregistered user {player.name}')
-            await channel.send(f'You have been deregistered for GuessTheGame tracking.')
+            await interaction.response.send_message('You have been deregistered for GuessTheGame tracking.')
             removed = True
     if not removed:
         print(f'Unregistered user {interaction.user.name.strip()} attempted to deregister')
-        await channel.send(f'You were already unregistered for GuessTheGame tracking.')
+        await interaction.response.send_message('You were already unregistered for GuessTheGame tracking.')
 
 
-@tasks.loop(hours=20)
+#@tasks.loop(hours=20)
+@tasks.loop(seconds=15)
 async def midnight_call():
+    if not PLAYERS:
+        return
+
     channel = client.get_channel(int(CHANNEL))
-    if not SCORED:
-        shamed = ''
-        for player in PLAYERS:
-            if not player.completed:
-                user = discord.utils.get(client.users, name=player.name)
-                shamed += f'{user.mention} '
+    shamed = ''
+    for player in PLAYERS:
+        if not player.completed:
+            user = discord.utils.get(client.users, name=player.name)
+            shamed += f'{user.mention} '
+    if shamed != '':
         await channel.send(f'SHAME ON {shamed} FOR NOT ATTEMPTING TO GUESS THE GAME!')
         tallyScores(PLAYERS)
-        SCORED = False
+
     everyone = ''
     for player in PLAYERS:
         player.completed = False
@@ -181,6 +183,11 @@ async def midnight_call():
 async def on_ready():
     print(f'{client.user} has connected to Discord!')
     await tree.sync()
+    if not midnight_call.is_running():
+        midnight_call.start()
+    if DEBUG:
+        channel = client.get_channel(int(CHANNEL))
+        await channel.send(f'{client.user} is now online')
 
 
 @client.event
@@ -230,6 +237,8 @@ async def on_message(message):
             if char == '🟥':
                 player.score += 1
             elif char == '🟩':
+                player.score += 1
+                player.success = True
                 break
         print(f'Player {player.name} got a score of {player.score}')
 
