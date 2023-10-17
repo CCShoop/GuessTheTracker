@@ -9,7 +9,7 @@ from dotenv import load_dotenv
 PLAYER_DELIMITER = ','
 NAME_DELIMITER = '_^'
 SCORE_DELIMITER = '%$'
-DEBUG = True
+DEBUG = False
 
 def replaceFileLines(substr, newValue):
     newFileLines = []
