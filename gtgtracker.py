@@ -62,15 +62,15 @@ def tallyScores(PLAYERS):
 
     placeCounter = 1
     for player in PLAYERS:
-        print(f'{placeCounter}. {player.name} ({player.wins}) with score of {player.score}')
+        print(f'{placeCounter}. {player.name} ({player.wins} wins) with score of {player.score}')
         if player in winners:
-            results.append(f'{placeCounter}. {player.name} ({player.wins}) wins by guessing the game in {player.score} guesses!\n')
+            results.append(f'{placeCounter}. {player.name} ({player.wins} wins) wins by guessing the game in {player.score} guesses!\n')
         elif player.success:
             placeCounter += 1
-            results.append(f'{placeCounter}. {player.name} ({player.wins}) guessed the game in {player.score} guesses.\n')
+            results.append(f'{placeCounter}. {player.name} ({player.wins} wins) guessed the game in {player.score} guesses.\n')
         else:
             placeCounter += 1
-            results.append(f'{placeCounter}. {player.name} ({player.wins}) did not successfully guess the game.\n')
+            results.append(f'{placeCounter}. {player.name} ({player.wins} wins) did not successfully guess the game.\n')
 
     for player in PLAYERS:
         player.score = 0
@@ -248,8 +248,12 @@ async def on_message(message):
 
         writeFile(replaceFileLines('PLAYERS', generatePlayersString(PLAYERS)))
 
-        await message.add_reaction('👍')
-        print('Added reaction to message')
+        if player.success:
+            await message.add_reaction('👍')
+            await channel.send(f'{player.name} ({player.wins} wins) guessed the game in {player.score} guesses!\n')
+        else:
+            await message.add_reaction('👎')
+            await channel.send(f'{player.name} ({player.wins} wins) did not successfully guess the game.\n')
 
         if unplayed == '':
             for score in tallyScores(PLAYERS):
