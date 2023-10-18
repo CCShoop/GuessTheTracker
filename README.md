@@ -11,7 +11,7 @@ I run it on my personal server which restarts daily at 4am, hence the 20 hour de
 
 * DISCORD_TOKEN (must be set manually)
 * TEXT_CHANNEL (can be set with /track in the desired text channel)
-* PLAYERS (will be filled from using /register)
+* SERVER_ID (must be set manually)
 
 
 ### Slash commands
