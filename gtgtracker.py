@@ -16,9 +16,12 @@ def main():
     '''Main function'''
     class GTGClient(discord.Client):
         '''Custom client class for GuessTheGame bot'''
+
+        FILE_PATH = 'info.json'
+
         def __init__(self, intents):
             self.text_channel = 0
-            self.is_first_call = True
+            self.server_id = 0
             super(GTGClient, self).__init__(intents=intents)
 
 
@@ -32,6 +35,79 @@ def main():
                 self.completed_today = completed_today
                 self.succeeded_today = succeeded_today
                 self.players = []
+
+
+        async def track_command(self, interaction):
+            '''Command to track a text channel'''
+            self.server_id = interaction.guild.id
+            if interaction.channel.id != int(self.text_channel):
+                self.text_channel = f'{interaction.channel.id}\n'
+                print(f'Now tracking channel {self.text_channel}', end='')
+                self.write_json_file()
+                os.putenv('TEXT_CHANNEL', self.text_channel)
+                await interaction.response.send_message('Now tracking this channel.')
+            else:
+                print('Tried to change channel tracking to current channel')
+                await interaction.response.send_message('Already tracking this channel.')
+
+
+        async def register_command(self, interaction):
+            '''Command to register a player'''
+            for player in self.players:
+                if interaction.user.name.strip() == player.name.strip():
+                    print(f'User {interaction.user.name.strip()} attempted to '
+                           're-register for tracking')
+                    await interaction.response.send_message('You are already registered '
+                                                            'for GuessTheGame tracking!')
+                    return
+
+            print(f'Registering user {interaction.user.name.strip()} for tracking')
+            player_obj = self.PlayerClass(interaction.user.name.strip(), 0, 0)
+            self.players.append(player_obj)
+            self.write_json_file()
+            await interaction.response.send_message('You have been registered '
+                                                    'for GuessTheGame tracking.')
+
+
+        async def deregister_command(self, interaction):
+            '''Command to deregister a player'''
+            removed = False
+            players_copy = self.players.copy()
+            for player in players_copy:
+                if player.name == interaction.user.name.strip():
+                    self.players.remove(player)
+                    self.write_json_file()
+                    print(f'Deregistered user {player.name}')
+                    await interaction.response.send_message('You have been '
+                                            'deregistered for GuessTheGame tracking.')
+                    removed = True
+            if not removed:
+                print(f'Unregistered user {interaction.user.name.strip()} attempted to deregister')
+                await interaction.response.send_message('You were already '
+                                            'unregistered for GuessTheGame tracking.')
+
+
+        async def midnight_call(self):
+            '''Midnight call task that is run at start and every 24 hours after that.'''
+            if not self.players:
+                return
+
+            channel = client.get_channel(int(self.text_channel))
+            shamed = ''
+            for player in self.players:
+                if not player.completed:
+                    user = discord.utils.get(client.users, name=player.name)
+                    shamed += f'{user.mention} '
+            if shamed != '':
+                await channel.send(f'SHAME ON {shamed} FOR NOT ATTEMPTING TO GUESS THE GAME!')
+                self.tally_scores()
+
+            everyone = ''
+            for player in self.players:
+                player.completed = False
+                user = discord.utils.get(client.users, name=player.name)
+                everyone += f'{user.mention} '
+            await channel.send(f'{everyone} it\'s time to Guess The Game!')
 
 
         async def on_ready(self):
@@ -142,103 +218,23 @@ def main():
                 print(f'Ignored message from {message.author}')
 
 
-        async def track_command(self, interaction):
-            '''Command to track a text channel'''
-            if interaction.channel.id != int(self.text_channel):
-                self.text_channel = f'{interaction.channel.id}\n'
-                print(f'Now tracking channel {self.text_channel}', end='')
-                self.write_json_file()
-                os.putenv('TEXT_CHANNEL', self.text_channel)
-                await interaction.response.send_message('Now tracking this channel.')
-            else:
-                print('Tried to change channel tracking to current channel')
-                await interaction.response.send_message('Already tracking this channel.')
-
-
-        async def register_command(self, interaction):
-            '''Command to register a player'''
-            for player in self.players:
-                if interaction.user.name.strip() == player.name.strip():
-                    print(f'User {interaction.user.name.strip()} attempted to '
-                           're-register for tracking')
-                    await interaction.response.send_message('You are already registered '
-                                                            'for GuessTheGame tracking!')
-                    return
-
-            print(f'Registering user {interaction.user.name.strip()} for tracking')
-            player_obj = self.PlayerClass(interaction.user.name.strip(), 0, 0)
-            self.players.append(player_obj)
-            self.write_json_file()
-            await interaction.response.send_message('You have been registered '
-                                                    'for GuessTheGame tracking.')
-
-
-        async def deregister_command(self, interaction):
-            '''Command to deregister a player'''
-            removed = False
-            players_copy = self.players.copy()
-            for player in players_copy:
-                if player.name == interaction.user.name.strip():
-                    self.players.remove(player)
-                    self.write_json_file()
-                    print(f'Deregistered user {player.name}')
-                    await interaction.response.send_message('You have been '
-                                            'deregistered for GuessTheGame tracking.')
-                    removed = True
-            if not removed:
-                print(f'Unregistered user {interaction.user.name.strip()} attempted to deregister')
-                await interaction.response.send_message('You were already '
-                                            'unregistered for GuessTheGame tracking.')
-
-
-        async def midnight_call(self):
-            '''
-            Midnight call task that is run at start and every 20 hours after that.
-            My server restarts at 4am which, paired with it ignoring the first time it runs,
-            means the midnight call occurs at midnight.
-            '''
-            if not self.players:
-                return
-            if self.is_first_call:
-                self.is_first_call = False
-                return
-
-            channel = client.get_channel(int(self.text_channel))
-            shamed = ''
-            for player in self.players:
-                if not player.completed:
-                    user = discord.utils.get(client.users, name=player.name)
-                    shamed += f'{user.mention} '
-            if shamed != '':
-                await channel.send(f'SHAME ON {shamed} FOR NOT ATTEMPTING TO GUESS THE GAME!')
-                self.tally_scores()
-
-            everyone = ''
-            for player in self.players:
-                player.completed = False
-                user = discord.utils.get(client.users, name=player.name)
-                everyone += f'{user.mention} '
-            await channel.send(f'{everyone} it\'s time to Guess The Game!')
-
-
         def read_json_file(self):
             '''Reads player information from the json file and puts it in the players list'''
-            # TODO: confirm self.guild.id functionality
-            file_path = JSON_FOLDER + str(self.guild.id) + JSON_EXT
-            if not os.path.exists(file_path):
+            if not os.path.exists(self.FILE_PATH):
                 return
-            with open(file_path, 'r', encoding='utf-8') as file:
+            with open(self.FILE_PATH, 'r', encoding='utf-8') as file:
                 data = json.load(file)
-                for player_name, player_data in data.items():
-                    if player_name == 'text_channel':
-                        self.text_channel = player_data
+                for first_field, second_field in data.items():
+                    if first_field == 'text_channel':
+                        self.text_channel = second_field
+                        print(f'Got text channel id of {self.text_channel}')
                     else:
-                        print(f'Loading data for {player_name}')
-                        load_player = self.PlayerClass(player_name,
-                                                       player_data['win_count'],
-                                                       player_data['score'],
-                                                       player_data['completed_today'],
-                                                       player_data['succeeded_today'])
+                        print(f'Loading data for {first_field}')
+                        load_player = self.PlayerClass(first_field,
+                                                       second_field['win_count'],
+                                                       second_field['score'],
+                                                       second_field['completed_today'],
+                                                       second_field['succeeded_today'])
                         self.players.append(load_player)
                         print(f'Loaded player {load_player.name} - '
                               f'win count: {load_player.win_count}, '
@@ -246,14 +242,12 @@ def main():
                               f'completed today: {load_player.completed_today}, '
                               f'succeeded today: {load_player.succeeded_today}')
 
-                print(f'Successfully loaded {file_path}')
+                print(f'Successfully loaded {self.FILE_PATH}')
 
 
         def write_json_file(self):
             '''Writes player information from the players list to the json file'''
-            # TODO: confirm self.guild.id functionality
-            file_name = JSON_FOLDER + str(self.guild.id) + JSON_EXT
-            with open(file_name, 'w+', encoding='utf-8') as file:
+            with open(self.FILE_PATH, 'w+', encoding='utf-8') as file:
                 data = {}
                 data['text_channel'] = self.text_channel
                 for player in self.players:
@@ -362,7 +356,7 @@ def main():
     async def deregister_command(interaction):
         client.deregister_command(interaction)
 
-    @tasks.loop(hours=20)
+    @tasks.loop(hours=24)
     async def midnight_call():
         client.midnight_call()
 
