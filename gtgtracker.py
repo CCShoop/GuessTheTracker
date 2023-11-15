@@ -160,9 +160,6 @@ def main():
                         results.append(f'{player.name} ({player.win_count} wins) did not '
                                         'successfully guess the game.\n')
                 place_counter += 1
-                player.guesses = 0
-                player.completed_today = False
-                player.succeeded_today = False
 
             self.write_json_file()
 
@@ -380,7 +377,9 @@ def main():
 
         everyone = ''
         for player in client.players:
+            player.guesses = 0
             player.completed_today = False
+            player.succeeded_today = False
             print(f'{client.users}')
             user = discord.utils.get(client.users, name=player.name)
             if user:
