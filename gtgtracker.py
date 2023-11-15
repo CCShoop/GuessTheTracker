@@ -3,12 +3,22 @@
 import os
 import json
 import discord
+import datetime
 from discord import app_commands
 from discord.ext import tasks
 from dotenv import load_dotenv
 
 
 load_dotenv()
+
+
+def get_time():
+    ct = str(datetime.datetime.now())
+    hour = int(ct[11:13])
+    minute = int(ct[14:16])
+    print(f'Current time is {hour}:{minute}')
+    return hour, minute
+
 
 def main():
     '''Main function'''
@@ -27,11 +37,11 @@ def main():
 
         class PlayerClass:
             '''Player template for storing player info'''
-            def __init__(self, name, win_count, score_today,
+            def __init__(self, name, win_count, guesses,
                          completed_today = False, succeeded_today = False):
                 self.name = name
                 self.win_count = win_count
-                self.score_today = score_today
+                self.guesses = guesses
                 self.completed_today = completed_today
                 self.succeeded_today = succeeded_today
 
@@ -56,13 +66,13 @@ def main():
                         print(f'Loading data for {first_field}')
                         load_player = self.PlayerClass(first_field,
                                                        second_field['win_count'],
-                                                       second_field['score_today'],
+                                                       second_field['guesses'],
                                                        second_field['completed_today'],
                                                        second_field['succeeded_today'])
                         self.players.append(load_player)
                         print(f'Loaded player {load_player.name} - '
                               f'win count: {load_player.win_count}, '
-                              f'score today: {load_player.score_today}, '
+                              f'score today: {load_player.guesses}, '
                               f'completed today: {load_player.completed_today}, '
                               f'succeeded today: {load_player.succeeded_today}')
 
@@ -75,7 +85,7 @@ def main():
             data['text_channel'] = self.text_channel
             for player in self.players:
                 data[player.name] = {'win_count': player.win_count,
-                                        'score_today': player.score_today,
+                                        'guesses': player.guesses,
                                         'completed_today': player.completed_today,
                                         'succeeded_today': player.succeeded_today}
                 print(f'{player.name} json data: {data[player.name]}')
@@ -87,7 +97,7 @@ def main():
 
         def get_score(self, player):
             '''Returns the player's score for sorting purposes'''
-            return player.score_today
+            return player.guesses
 
 
         def tally_scores(self):
@@ -110,7 +120,7 @@ def main():
                 winners.append(first_winner)
                 # for the rest of the players, check if they're tied
                 for player_it in self.players[1:]:
-                    if player_it.score_today == first_winner.score:
+                    if player_it.guesses == first_winner.guesses:
                         winners.append(player_it)
                     else:
                         break
@@ -118,30 +128,30 @@ def main():
             place_counter = 1
             for player in self.players:
                 print(f'{place_counter}. {player.name} ({player.win_count} wins) with score '
-                      f'of {player.score_today}')
+                      f'of {player.guesses}')
                 if player in winners:
                     player.win_count += 1
                     if player.win_count == 1:
-                        if player.score_today == 1:
+                        if player.guesses == 1:
                             results.append(f'1. {player.name} (1 win) wins by '
                                             'guessing the game in ONE GUESS! NICE ONE!\n')
                         else:
                             results.append(f'1. {player.name} (1 win) wins by '
-                                           f'guessing the game in {player.score_today} guesses!\n')
+                                           f'guessing the game in {player.guesses} guesses!\n')
                     else:
-                        if player.score_today == 1:
+                        if player.guesses == 1:
                             results.append(f'1. {player.name} ({player.win_count} wins) '
                                             'wins by guessing the game in ONE GUESS! NICE ONE!\n')
                         else:
                             results.append(f'1. {player.name} ({player.win_count} wins) wins '
-                                           f'by guessing the game in {player.score_today} guesses!\n')
+                                           f'by guessing the game in {player.guesses} guesses!\n')
                 elif player.succeeded_today:
                     if player.win_count == 1:
                         results.append(f'{place_counter}. {player.name} (1 win) '
-                                       f'guessed the game in {player.score_today} guesses.\n')
+                                       f'guessed the game in {player.guesses} guesses.\n')
                     else:
                         results.append(f'{place_counter}. {player.name} ({player.win_count} wins) '
-                                       f'guessed the game in {player.score_today} guesses.\n')
+                                       f'guessed the game in {player.guesses} guesses.\n')
                 else:
                     if player.win_count == 1:
                         results.append(f'{player.name} (1 win) did not successfully '
@@ -150,7 +160,7 @@ def main():
                         results.append(f'{player.name} ({player.win_count} wins) did not '
                                         'successfully guess the game.\n')
                 place_counter += 1
-                player.score_today = 0
+                player.guesses = 0
                 player.completed_today = False
                 player.succeeded_today = False
 
@@ -228,34 +238,37 @@ def main():
             result = message.content.splitlines()[2].replace(' ', '')[1:]
             print('Result line: ' + result)
             player.completed_today = True
-            player.score_today = 0
+            player.succeeded_today = False
+            player.guesses = 0
             for char in result:
                 if char == '🟥':
-                    player.score_today += 1
+                    player.guesses += 1
+                elif char == '🟨':
+                    player.guesses += 1
                 elif char == '🟩':
-                    player.score_today += 1
+                    player.guesses += 1
                     player.succeeded_today = True
                     break
-            print(f'Player {player.name} got a score of {player.score_today}')
+            print(f'Player {player.name} got a score of {player.guesses}')
 
             client.write_json_file()
 
             if player.succeeded_today:
                 await message.add_reaction('👍')
                 if player.win_count == 1:
-                    if player.score_today == 1:
+                    if player.guesses == 1:
                         await channel.send(f'{player.name} (1 win) guessed the game in '
                                             '1 guess!\n')
                     else:
                         await channel.send(f'{player.name} (1 win) guessed the game in '
-                                            f'{player.score_today} guesses!\n')
+                                            f'{player.guesses} guesses!\n')
                 else:
-                    if player.score_today == 1:
+                    if player.guesses == 1:
                         await channel.send(f'{player.name} ({player.win_count} wins) guessed '
                                             'the game in 1 guess!\n')
                     else:
                         await channel.send(f'{player.name} ({player.win_count} wins) guessed '
-                                            f'the game in {player.score_today} guesses!\n')
+                                            f'the game in {player.guesses} guesses!\n')
             else:
                 await message.add_reaction('👎')
                 if player.win_count == 1:
@@ -265,7 +278,13 @@ def main():
                     await channel.send(f'{player.name} ({player.win_count} wins) did not '
                                         'successfully guess the game.\n')
 
-            if unplayed == '':
+            all_completed = True
+            for player in client.players:
+                all_completed = player.completed_today
+                if not all_completed:
+                    break
+
+            if all_completed:
                 for score in client.tally_scores():
                     await channel.send(score)
             else:
@@ -328,9 +347,16 @@ def main():
                                         'unregistered for GuessTheGame tracking.')
 
 
-    @tasks.loop(hours=24)
+    @tasks.loop(seconds = 1)
     async def midnight_call():
-        '''Midnight call loop task that is run every 24 hours.'''
+        '''Midnight call loop task that is run every minute with a midnight check.'''
+
+        hour, minutes = get_time()
+        if hour != 0 or minutes != 0:
+            return
+        
+        print('It is midnight, sending daily scoreboard and mentioning registered players')
+
         if not client.players:
             return
 
@@ -346,7 +372,8 @@ def main():
                     print(f'Failed to mention user {player.name}')
         if shamed != '':
             await channel.send(f'SHAME ON {shamed} FOR NOT ATTEMPTING TO GUESS THE GAME!')
-            client.tally_scores()
+            for score in client.tally_scores():
+                await channel.send(score)
 
         everyone = ''
         for player in client.players:
