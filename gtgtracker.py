@@ -16,7 +16,6 @@ def get_time():
     ct = str(datetime.datetime.now())
     hour = int(ct[11:13])
     minute = int(ct[14:16])
-    print(f'Current time is {hour}:{minute}')
     return hour, minute
 
 
@@ -32,6 +31,7 @@ def main():
             self.text_channel = 0
             self.server_id = 0
             self.players = []
+            self.scored_today = False
             self.tree = app_commands.CommandTree(self)
 
 
@@ -351,11 +351,14 @@ def main():
     async def midnight_call():
         '''Midnight call loop task that is run every minute with a midnight check.'''
 
-        hour, minutes = get_time()
-        if hour != 0 or minutes != 0:
+        hours, minutes = get_time()
+        if client.scored_today and hours == 0 and minutes == 1:
+            client.scored_today = False
+        if hours != 0 or minutes != 0 or client.scored_today:
             return
-        
-        print('It is midnight, sending daily scoreboard and mentioning registered players')
+        client.scored_today = True
+
+        print('It is midnight, sending daily scoreboard and then mentioning registered players')
 
         if not client.players:
             return
