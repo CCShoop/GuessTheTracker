@@ -114,17 +114,6 @@ def main():
                                'completedToday': player.gtaudio.completedToday,
                                'succeededToday': player.gtaudio.succeededToday}
                 }
-                # data[player.name] = {}
-                # data[player.name]['gtgame']  = {'winCount': player.gtgame.winCount,
-                #                                 'guesses': player.gtgame.guesses,
-                #                                 'registered': player.gtgame.registered,
-                #                                 'completedToday': player.gtgame.completedToday,
-                #                                 'succeededToday': player.gtgame.succeededToday},
-                # data[player.name]['gtaudio'] = {'winCount': player.gtaudio.winCount,
-                #                                 'guesses': player.gtaudio.guesses,
-                #                                 'registered': player.gtaudio.registered,
-                #                                 'completedToday': player.gtaudio.completedToday,
-                #                                 'succeededToday': player.gtaudio.succeededToday}
                 print(f'{player.name} json data: {data[player.name]}')
             json_data = json.dumps(data)
             print(f'Writing {self.FILE_PATH}')
@@ -180,16 +169,6 @@ def main():
                 print(f'Text channel with id {channel.id} doesn\'t match a saved id')
 
 
-        def get_gtg_guesses(self, player):
-            '''Returns the game score for sorting purposes'''
-            return player.gtgame.guesses
-
-
-        def get_gta_guesses(self, player):
-            '''Returns the audio score for sorting purposes'''
-            return player.gtaudio.guesses
-
-
         def tally_gtg_scores(self):
             '''Sorts players and returns a list of strings to send as Discord messages'''
             if not self.players:
@@ -202,7 +181,7 @@ def main():
             results.append('\nGUESSING COMPLETE!\n\n**SCOREBOARD:**\n')
 
             # sort the players
-            self.players.sort(key=self.get_gtg_guesses)
+            self.players.sort(key=player.gtgame.guesses)
             if self.players[0].gtgame.succeededToday:
                 # if the player(s) with the lowest score successfully
                 # guessed the game, they are the first winner
@@ -216,6 +195,7 @@ def main():
                         break
 
             place_counter = 1
+            prev_guesses = 0
             for player in self.players:
                 print(f'{place_counter}. {player.name} ({player.gtgame.winCount} wins) with {player.gtgame.guesses} guesses')
                 if player in winners:
@@ -240,7 +220,9 @@ def main():
                         results.append(f'{player.name} (1 win) did not successfully guess the game.\n')
                     else:
                         results.append(f'{player.name} ({player.gtgame.winCount} wins) did not successfully guess the game.\n')
-                place_counter += 1
+                if prev_guesses != player.gtgame.guesses:
+                    place_counter += 1
+                prev_guesses = player.gtgame.guesses
 
             self.write_json_file()
 
@@ -259,7 +241,7 @@ def main():
             results.append('\nGUESSING COMPLETE!\n\n**SCOREBOARD:**\n')
 
             # sort the players
-            self.players.sort(key=self.get_gta_guesses)
+            self.players.sort(key=player.gtaudio.guesses)
             if self.players[0].gtaudio.succeededToday:
                 # if the player(s) with the lowest score successfully
                 # guessed the game, they are the first winner
@@ -273,6 +255,7 @@ def main():
                         break
 
             place_counter = 1
+            prev_guesses = 0
             for player in self.players:
                 print(f'{place_counter}. {player.name} ({player.gtaudio.winCount} wins) with {player.gtaudio.guesses} guesses')
                 if player in winners:
@@ -297,7 +280,9 @@ def main():
                         results.append(f'{player.name} (1 win) did not successfully guess the audio.\n')
                     else:
                         results.append(f'{player.name} ({player.gtaudio.winCount} wins) did not successfully guess the audio.\n')
-                place_counter += 1
+                if prev_guesses != player.gtaudio.guesses:
+                    place_counter += 1
+                prev_guesses = player.gtaudio.guesses
 
             self.write_json_file()
 
