@@ -132,7 +132,7 @@ def main():
                 file.write(json_data)
 
 
-        async def process(self, name, message: discord.Message, channel: discord.TextChannel, guessThe: GuessThe):
+        async def process(self, name, message: discord.Message, channel: discord.TextChannel, guessThe: GuessThe, gt: str):
             # player has already sent results
             if guessThe.completedToday:
                 print(f'{name} tried to resubmit results')
@@ -159,7 +159,9 @@ def main():
             client.write_json_file()
 
             for player in client.players:
-                if not guessThe.completedToday:
+                if gt == 'gtgame' and not player.gtgame.completedToday:
+                    return
+                if gt == 'gtaudio' and not player.gtaudio.completedToday:
                     return
 
             if channel.id == int(client.gtg_text_channel):
@@ -364,7 +366,7 @@ def main():
             print(f'Received GuessTheGame message from {message.author}')
 
             guessThe = player.gtgame
-            await client.process(player.name, message, channel, guessThe)
+            await client.process(player.name, message, channel, guessThe, 'gtgame')
 
             if guessThe.succeededToday:
                 await message.add_reaction('👍')
@@ -379,7 +381,7 @@ def main():
             print(f'Received GuessTheAudio message from {message.author}')
 
             guessThe = player.gtaudio
-            await client.process(player.name, message, channel, guessThe)
+            await client.process(player.name, message, channel, guessThe, 'gtaudio')
 
             if guessThe.succeededToday:
                 await message.add_reaction('👍')
