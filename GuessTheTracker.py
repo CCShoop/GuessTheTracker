@@ -114,7 +114,6 @@ def main():
                                'completedToday': player.gtaudio.completedToday,
                                'succeededToday': player.gtaudio.succeededToday}
                 }
-                print(f'{player.name} json data: {data[player.name]}')
             json_data = json.dumps(data)
             print(f'Writing {self.FILE_PATH}')
             with open(self.FILE_PATH, 'w+', encoding='utf-8') as file:
