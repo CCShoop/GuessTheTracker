@@ -20,6 +20,15 @@ def get_time():
     return hour, minute
 
 
+
+def get_gtg_guesses(player):
+    return player.gtgame.guesses
+
+
+def get_gta_guesses(player):
+    return player.gtaudio.guesses
+
+
 def main():
     '''Main function'''
     class GuessTheClient(discord.Client):
@@ -120,16 +129,14 @@ def main():
                 file.write(json_data)
 
 
-        async def process(self, name, message: discord.Message, channel: discord.TextChannel, guessThe: GuessThe, gt: str):
+        async def process(self, name, message: discord.Message, channel: discord.TextChannel, guessThe: GuessThe):
             # player has already sent results
             if guessThe.completedToday:
                 print(f'{name} tried to resubmit results')
-                await channel.send(f'{name}, you have already submitted your '
-                                    'results today.')
+                await channel.send(f'{name}, you have already submitted your results today.')
                 return
 
             result = message.content.splitlines()[2].replace(' ', '')[1:]
-            print('Result line: ' + result)
             guessThe.completedToday = True
             guessThe.succeededToday = False
             guessThe.guesses = 0
@@ -146,25 +153,27 @@ def main():
 
             client.write_json_file()
 
+            scoreGTG = True
+            scoreGTA = True
             for player in client.players:
-                if gt == 'gtgame' and not player.gtgame.completedToday:
-                    return
-                if gt == 'gtaudio' and not player.gtaudio.completedToday:
-                    return
+                if channel.id == int(client.gtg_text_channel) and player.gtgame.registered and not player.gtgame.completedToday:
+                    scoreGTG = False
+                if channel.id == int(client.gta_text_channel) and player.gtaudio.registered and not player.gtaudio.completedToday:
+                    scoreGTA = False
 
-            if channel.id == int(client.gtg_text_channel):
+            if channel.id == int(client.gtg_text_channel) and scoreGTG:
                 scoreboard = ''
                 scoreboardList = client.tally_gtg_scores()
                 for line in scoreboardList:
                     scoreboard += line
                 await channel.send(scoreboard)
-            elif channel.id == int(client.gta_text_channel):
+            if channel.id == int(client.gta_text_channel) and scoreGTA:
                 scoreboard = ''
                 scoreboardList = client.tally_gta_scores()
                 for line in scoreboardList:
                     scoreboard += line
                 await channel.send(scoreboard)
-            else:
+            if channel.id != int(client.gtg_text_channel) and channel.id != int(client.gta_text_channel):
                 print(f'Text channel with id {channel.id} doesn\'t match a saved id')
 
 
@@ -180,7 +189,7 @@ def main():
             results.append('\nGUESSING COMPLETE!\n\n**SCOREBOARD:**\n')
 
             # sort the players
-            self.players.sort(key=player.gtgame.guesses)
+            self.players.sort(key=get_gtg_guesses)
             if self.players[0].gtgame.succeededToday:
                 # if the player(s) with the lowest score successfully
                 # guessed the game, they are the first winner
@@ -240,7 +249,7 @@ def main():
             results.append('\nGUESSING COMPLETE!\n\n**SCOREBOARD:**\n')
 
             # sort the players
-            self.players.sort(key=player.gtaudio.guesses)
+            self.players.sort(key=get_gta_guesses)
             if self.players[0].gtaudio.succeededToday:
                 # if the player(s) with the lowest score successfully
                 # guessed the game, they are the first winner
@@ -350,32 +359,22 @@ def main():
             print(f'Received GuessTheGame message from {message.author}')
 
             guessThe = player.gtgame
-            await client.process(player.name, message, channel, guessThe, 'gtgame')
+            await client.process(player.name, message, channel, guessThe)
 
             if guessThe.succeededToday:
                 await message.add_reaction('👍')
-                if guessThe.guesses == 1:
-                    await channel.send(f'{player.name} guessed the game in 1 guess! Nice one!\n')
-                else:
-                    await channel.send(f'{player.name} guessed the game in {guessThe.guesses} guesses!\n')
             else:
                 await message.add_reaction('👎')
-                await channel.send(f'{player.name} did not successfully guess the game.\n')
         elif '#GuessTheAudio' in message.content:
             print(f'Received GuessTheAudio message from {message.author}')
 
             guessThe = player.gtaudio
-            await client.process(player.name, message, channel, guessThe, 'gtaudio')
+            await client.process(player.name, message, channel, guessThe)
 
             if guessThe.succeededToday:
                 await message.add_reaction('👍')
-                if guessThe.guesses == 1:
-                    await channel.send(f'{player.name} guessed the audio in 1 guess! Nice one!\n')
-                else:
-                    await channel.send(f'{player.name} guessed the audio in {guessThe.guesses} guesses!\n')
             else:
                 await message.add_reaction('👎')
-                await channel.send(f'{player.name} did not successfully guess the audio.\n')
         else:
             print(f'Ignored message from {message.author}')
 
