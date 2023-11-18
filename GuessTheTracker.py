@@ -317,8 +317,8 @@ def main():
         elif '#GuessTheAudio' in message.content:
             channel = client.get_channel(int(client.gta_text_channel))
 
-        # someone posts their GTG results
-        if '#GuessTheGame' in message.content or '#GuessTheGame' in message.content:
+        # someone posts their GuessThe results
+        if '#GuessTheGame' in message.content or '#GuessTheAudio' in message.content:
             user = discord.utils.get(client.users, name=message.author.name)
             # there are no registered players
             if not client.players:
