@@ -185,6 +185,7 @@ def main():
 
             print('Tallying scores')
             winners = [] # list of winners - the one/those with the lowest score
+            losers = [] # list of losers - the strings for people who didn't guess the game
             results = [] # list of strings - the scoreboard to print out
             results.append('\nGUESSING COMPLETE!\n\n**SCOREBOARD:**\n')
 
@@ -205,6 +206,8 @@ def main():
             place_counter = 1
             prev_guesses = 0
             for player in self.players:
+                if not player.gtgame.registered:
+                    continue
                 print(f'{place_counter}. {player.name} ({player.gtgame.winCount} wins) with {player.gtgame.guesses} guesses')
                 if player in winners:
                     player.gtgame.winCount += 1
@@ -225,16 +228,16 @@ def main():
                         results.append(f'{place_counter}. {player.name} ({player.gtgame.winCount} wins) guessed the game in {player.gtgame.guesses} guesses.\n')
                 else:
                     if player.gtgame.winCount == 1:
-                        results.append(f'{player.name} (1 win) did not successfully guess the game.\n')
+                        losers.append(f'{player.name} (1 win) did not successfully guess the game.\n')
                     else:
-                        results.append(f'{player.name} ({player.gtgame.winCount} wins) did not successfully guess the game.\n')
+                        losers.append(f'{player.name} ({player.gtgame.winCount} wins) did not successfully guess the game.\n')
                 if prev_guesses != player.gtgame.guesses:
                     place_counter += 1
                 prev_guesses = player.gtgame.guesses
 
             self.write_json_file()
 
-            return results
+            return results + losers
 
 
         def tally_gta_scores(self):
@@ -245,11 +248,14 @@ def main():
 
             print('Tallying scores')
             winners = [] # list of winners - the one/those with the lowest score
+            losers = [] # list of losers - the strings for people who didn't guess the audio
             results = [] # list of strings - the scoreboard to print out
             results.append('\nGUESSING COMPLETE!\n\n**SCOREBOARD:**\n')
 
             # sort the players
             self.players.sort(key=get_gta_guesses)
+            for player in self.players:
+                print(f'SORTING: {player.name}:\t{player.guesses}')
             if self.players[0].gtaudio.succeededToday:
                 # if the player(s) with the lowest score successfully
                 # guessed the game, they are the first winner
@@ -265,6 +271,8 @@ def main():
             place_counter = 1
             prev_guesses = 0
             for player in self.players:
+                if not player.gtaudio.registered:
+                    continue
                 print(f'{place_counter}. {player.name} ({player.gtaudio.winCount} wins) with {player.gtaudio.guesses} guesses')
                 if player in winners:
                     player.gtaudio.winCount += 1
@@ -285,16 +293,16 @@ def main():
                         results.append(f'{place_counter}. {player.name} ({player.gtaudio.winCount} wins) guessed the audio in {player.gtaudio.guesses} guesses.\n')
                 else:
                     if player.gtaudio.winCount == 1:
-                        results.append(f'{player.name} (1 win) did not successfully guess the audio.\n')
+                        losers.append(f'{player.name} (1 win) did not successfully guess the audio.\n')
                     else:
-                        results.append(f'{player.name} ({player.gtaudio.winCount} wins) did not successfully guess the audio.\n')
+                        losers.append(f'{player.name} ({player.gtaudio.winCount} wins) did not successfully guess the audio.\n')
                 if prev_guesses != player.gtaudio.guesses:
                     place_counter += 1
                 prev_guesses = player.gtaudio.guesses
 
             self.write_json_file()
 
-            return results
+            return results + losers
 
 
 
@@ -321,6 +329,7 @@ def main():
             return
 
         player = client.players[0]
+        channel: discord.TextChannel
         if '#GuessTheGame' in message.content:
             channel = client.get_channel(int(client.gtg_text_channel))
         elif '#GuessTheAudio' in message.content:
@@ -331,8 +340,7 @@ def main():
             user = discord.utils.get(client.users, name=message.author.name)
             # there are no registered players
             if not client.players:
-                await channel.send(f'{user.mention}, there are no registered players! '
-                            'Please register and resend your results to be the first.')
+                await channel.send(f'{user.mention}, there are no registered players! Please register and resend your results to be the first.')
                 return
 
             # player is not registered
@@ -341,8 +349,7 @@ def main():
                 if message.author.name == player_it.name:
                     found = True
             if not found:
-                await channel.send(f'{message.author.name}, you are not registered! '
-                                            'Please register and resend your results.')
+                await channel.send(f'{message.author.name}, you are not registered! Please register and resend your results.')
 
             found = False
             for player_it in client.players:
@@ -351,8 +358,7 @@ def main():
                     player = player_it
             if not found:
                 print('Unregistered player posted a result')
-                await channel.send(f'Unregistered user {user.mention} attempted to post '
-                            'a result. Please register with "/register" and try again.')
+                await channel.send(f'Unregistered user {user.mention} attempted to post a result. Please register with "/register" and try again.')
                 return
 
         if '#GuessTheGame' in message.content:
@@ -489,16 +495,16 @@ def main():
 
     @tasks.loop(seconds = 1)
     async def midnight_call():
-        '''Midnight call loop task that is run every minute with a midnight check.'''
+        '''Midnight call loop task that is run every second with an almost midnight check.'''
 
         hours, minutes = get_time()
-        if client.scored_today and hours == 0 and minutes == 1:
+        if client.scored_today and hours == 23 and minutes == 31:
             client.scored_today = False
-        if hours != 0 or minutes != 0 or client.scored_today:
+        if hours != 23 or minutes != 30 or client.scored_today:
             return
         client.scored_today = True
 
-        print('It is midnight, sending daily scoreboard and then mentioning registered players')
+        print('It is almost midnight, sending daily scoreboard and then mentioning registered players')
 
         if not client.players:
             return
@@ -508,14 +514,14 @@ def main():
         gtg_shamed = ''
         gta_shamed = ''
         for player in client.players:
-            if not player.gtgame.completedToday:
+            if player.gtgame.registered and not player.gtgame.completedToday:
                 print(f'{client.users}')
                 user = discord.utils.get(client.users, name=player.name)
                 if user:
                     gtg_shamed += f'{user.mention} '
                 else:
                     print(f'Failed to mention user {player.name}')
-            if not player.gtaudio.completedToday:
+            if player.gtaudio.registered and not player.gtaudio.completedToday:
                 print(f'{client.users}')
                 user = discord.utils.get(client.users, name=player.name)
                 if user:
@@ -527,7 +533,7 @@ def main():
             for score in client.tally_gtg_scores():
                 await gtg_channel.send(score)
         if gta_shamed != '':
-            await gta_channel.send(f'SHAME ON {gta_shamed} FOR NOT ATTEMPTING TO GUESS THE GAME!')
+            await gta_channel.send(f'SHAME ON {gta_shamed} FOR NOT ATTEMPTING TO GUESS THE AUDIO!')
             for score in client.tally_gta_scores():
                 await gta_channel.send(score)
 
@@ -549,8 +555,8 @@ def main():
                     gta_everyone += f'{user.mention} '
             else:
                 print(f'Failed to mention user {player.name}')
-        await gtg_channel.send(f'{gtg_everyone}\nIt\'s time to Guess The Game!')
-        await gta_channel.send(f'{gta_everyone}\nIt\'s time to Guess The Audio!')
+        await gtg_channel.send(f'{gtg_everyone}\nIt\'s time to Guess The Game!\nhttps://guessthe.game/')
+        await gta_channel.send(f'{gta_everyone}\nIt\'s time to Guess The Audio!\nhttps://guesstheaudio.com/')
 
 
     client.run(discord_token)
