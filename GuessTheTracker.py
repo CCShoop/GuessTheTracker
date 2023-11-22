@@ -254,8 +254,6 @@ def main():
 
             # sort the players
             self.players.sort(key=get_gta_guesses)
-            for player in self.players:
-                print(f'SORTING: {player.name}:\t{player.guesses}')
             if self.players[0].gtaudio.succeededToday:
                 # if the player(s) with the lowest score successfully
                 # guessed the game, they are the first winner
