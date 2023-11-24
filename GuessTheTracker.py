@@ -183,7 +183,7 @@ def main():
                 print('No players to score')
                 return
 
-            print('Tallying scores')
+            print('GTG> Tallying scores')
             winners = [] # list of winners - the one/those with the lowest score
             losers = [] # list of losers - the strings for people who didn't guess the game
             results = [] # list of strings - the scoreboard to print out
@@ -191,13 +191,20 @@ def main():
 
             # sort the players
             self.players.sort(key=get_gtg_guesses)
-            if self.players[0].gtgame.succeededToday:
+            idx = 0
+            checkPlayer = self.players[idx]
+            for player_it in self.players:
+                idx += 1
+                if player_it.gtgame.registered:
+                    checkPlayer = player_it
+                    break
+            if checkPlayer.gtgame.succeededToday:
                 # if the player(s) with the lowest score successfully
                 # guessed the game, they are the first winner
-                first_winner = self.players[0]
+                first_winner = checkPlayer
                 winners.append(first_winner)
                 # for the rest of the players, check if they're tied
-                for player_it in self.players[1:]:
+                for player_it in self.players[idx:]:
                     if player_it.gtgame.guesses == first_winner.gtgame.guesses:
                         winners.append(player_it)
                     else:
@@ -208,7 +215,7 @@ def main():
             for player in self.players:
                 if not player.gtgame.registered:
                     continue
-                print(f'{place_counter}. {player.name} ({player.gtgame.winCount} wins) with {player.gtgame.guesses} guesses')
+                print(f'GTG> {place_counter}. {player.name} ({player.gtgame.winCount} wins) with {player.gtgame.guesses} guesses')
                 if player in winners:
                     player.gtgame.winCount += 1
                     if player.gtgame.winCount == 1:
@@ -246,7 +253,7 @@ def main():
                 print('No players to score')
                 return
 
-            print('Tallying scores')
+            print('GTA> Tallying scores')
             winners = [] # list of winners - the one/those with the lowest score
             losers = [] # list of losers - the strings for people who didn't guess the audio
             results = [] # list of strings - the scoreboard to print out
@@ -254,13 +261,20 @@ def main():
 
             # sort the players
             self.players.sort(key=get_gta_guesses)
-            if self.players[0].gtaudio.succeededToday:
+            idx = 0
+            checkPlayer = self.players[idx]
+            for player_it in self.players:
+                idx += 1
+                if player_it.gtaudio.registered:
+                    checkPlayer = player_it
+                    break
+            if checkPlayer.gtaudio.succeededToday:
                 # if the player(s) with the lowest score successfully
                 # guessed the game, they are the first winner
-                first_winner = self.players[0]
+                first_winner = checkPlayer
                 winners.append(first_winner)
                 # for the rest of the players, check if they're tied
-                for player_it in self.players[1:]:
+                for player_it in self.players[idx:]:
                     if player_it.gtaudio.guesses == first_winner.gtaudio.guesses:
                         winners.append(player_it)
                     else:
@@ -271,7 +285,7 @@ def main():
             for player in self.players:
                 if not player.gtaudio.registered:
                     continue
-                print(f'{place_counter}. {player.name} ({player.gtaudio.winCount} wins) with {player.gtaudio.guesses} guesses')
+                print(f'GTA> {place_counter}. {player.name} ({player.gtaudio.winCount} wins) with {player.gtaudio.guesses} guesses')
                 if player in winners:
                     player.gtaudio.winCount += 1
                     if player.gtaudio.winCount == 1:
