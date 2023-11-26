@@ -141,15 +141,13 @@ def main():
             guessThe.succeededToday = False
             guessThe.guesses = 0
             for char in result:
-                if char == '🟥':
-                    guessThe.guesses += 1
-                elif char == '🟨':
+                if char == '🟥' or char == '🟨':
                     guessThe.guesses += 1
                 elif char == '🟩':
                     guessThe.guesses += 1
                     guessThe.succeededToday = True
                     break
-            print(f'Player {name} got a score of {guessThe.guesses}')
+            print(f'Player {name} - guesses: {guessThe.guesses}, succeeded: {guessThe.succeededToday}')
 
             client.write_json_file()
 
@@ -205,7 +203,7 @@ def main():
                 winners.append(first_winner)
                 # for the rest of the players, check if they're tied
                 for player_it in self.players[idx:]:
-                    if player_it.gtgame.guesses == first_winner.gtgame.guesses:
+                    if player_it.gtgame.guesses == first_winner.gtgame.guesses and player_it.gtgame.succeededToday:
                         winners.append(player_it)
                     else:
                         break
@@ -275,7 +273,7 @@ def main():
                 winners.append(first_winner)
                 # for the rest of the players, check if they're tied
                 for player_it in self.players[idx:]:
-                    if player_it.gtaudio.guesses == first_winner.gtaudio.guesses:
+                    if player_it.gtaudio.guesses == first_winner.gtaudio.guesses and player_it.gtaudio.succeededToday:
                         winners.append(player_it)
                     else:
                         break
