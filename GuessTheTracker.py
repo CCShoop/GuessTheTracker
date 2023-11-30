@@ -81,8 +81,10 @@ def main():
                         self.gta_text_channel = secondField['gta_text_channel']
                         print(f'Got GTG text channel id of {self.gtg_text_channel}')
                         print(f'Got GTA text channel id of {self.gta_text_channel}')
+                    elif firstField == 'scored_today':
+                        self.scored_today = secondField['scored_today']
+                        print(f'Got scored_today as {self.scored_today}')
                     else:
-                        print(f'Loading data for {firstField}')
                         load_player = self.Player(firstField)
                         load_player.gtgame.winCount = secondField['gtgame']['winCount']
                         load_player.gtgame.guesses = secondField['gtgame']['guesses']
@@ -110,6 +112,7 @@ def main():
             data = {}
             data['text_channels'] = {'gtg_text_channel': self.gtg_text_channel,
                                      'gta_text_channel': self.gta_text_channel}
+            data['scored_today'] = {'scored_today': client.scored_today}
             for player in self.players:
                 data[player.name] = {
                     'gtgame': {'winCount': player.gtgame.winCount,
@@ -188,10 +191,14 @@ def main():
             results.append('\nGUESSING COMPLETE!\n\n**SCOREBOARD:**\n')
 
             # sort the players
-            self.players.sort(key=get_gtg_guesses)
+            gtg_players = []
+            for player in self.players:
+                if player.gtgame.registered:
+                    gtg_players.append(player)
+            gtg_players.sort(key=get_gtg_guesses)
             idx = 0
-            checkPlayer = self.players[idx]
-            for player_it in self.players:
+            checkPlayer = gtg_players[idx]
+            for player_it in gtg_players:
                 idx += 1
                 if player_it.gtgame.registered:
                     checkPlayer = player_it
@@ -202,7 +209,7 @@ def main():
                 first_winner = checkPlayer
                 winners.append(first_winner)
                 # for the rest of the players, check if they're tied
-                for player_it in self.players[idx:]:
+                for player_it in gtg_players[idx:]:
                     if player_it.gtgame.guesses == first_winner.gtgame.guesses and player_it.gtgame.succeededToday:
                         winners.append(player_it)
                     else:
@@ -210,7 +217,7 @@ def main():
 
             place_counter = 1
             prev_guesses = 0
-            for player in self.players:
+            for player in gtg_players:
                 if not player.gtgame.registered:
                     continue
                 print(f'GTG> {place_counter}. {player.name} ({player.gtgame.winCount} wins) with {player.gtgame.guesses} guesses')
@@ -258,10 +265,14 @@ def main():
             results.append('\nGUESSING COMPLETE!\n\n**SCOREBOARD:**\n')
 
             # sort the players
-            self.players.sort(key=get_gta_guesses)
+            gta_players = []
+            for player in self.players:
+                if player.gtaudio.registered:
+                    gta_players.append(player)
+            gta_players.sort(key=get_gta_guesses)
             idx = 0
-            checkPlayer = self.players[idx]
-            for player_it in self.players:
+            checkPlayer = gta_players[idx]
+            for player_it in gta_players:
                 idx += 1
                 if player_it.gtaudio.registered:
                     checkPlayer = player_it
@@ -272,7 +283,7 @@ def main():
                 first_winner = checkPlayer
                 winners.append(first_winner)
                 # for the rest of the players, check if they're tied
-                for player_it in self.players[idx:]:
+                for player_it in gta_players[idx:]:
                     if player_it.gtaudio.guesses == first_winner.gtaudio.guesses and player_it.gtaudio.succeededToday:
                         winners.append(player_it)
                     else:
@@ -280,7 +291,7 @@ def main():
 
             place_counter = 1
             prev_guesses = 0
-            for player in self.players:
+            for player in gta_players:
                 if not player.gtaudio.registered:
                     continue
                 print(f'GTA> {place_counter}. {player.name} ({player.gtaudio.winCount} wins) with {player.gtaudio.guesses} guesses')
@@ -391,8 +402,6 @@ def main():
                 await message.add_reaction('👍')
             else:
                 await message.add_reaction('👎')
-        else:
-            print(f'Ignored message from {message.author}')
 
 
     @client.tree.command(name='track', description='Track this text channel for GuessTheGame or GuessTheAudio.')
@@ -525,19 +534,13 @@ def main():
         gta_shamed = ''
         for player in client.players:
             if player.gtgame.registered and not player.gtgame.completedToday:
-                print(f'{client.users}')
                 user = discord.utils.get(client.users, name=player.name)
                 if user:
                     gtg_shamed += f'{user.mention} '
-                else:
-                    print(f'Failed to mention user {player.name}')
             if player.gtaudio.registered and not player.gtaudio.completedToday:
-                print(f'{client.users}')
                 user = discord.utils.get(client.users, name=player.name)
                 if user:
                     gta_shamed += f'{user.mention} '
-                else:
-                    print(f'Failed to mention user {player.name}')
         if gtg_shamed != '':
             await gtg_channel.send(f'SHAME ON {gtg_shamed} FOR NOT ATTEMPTING TO GUESS THE GAME!')
             for score in client.tally_gtg_scores():
@@ -556,15 +559,12 @@ def main():
             player.gtaudio.completedToday = False
             player.gtgame.succeededToday = False
             player.gtaudio.succeededToday = False
-            print(f'{client.users}')
             user = discord.utils.get(client.users, name=player.name)
             if user:
                 if player.gtgame.registered:
                     gtg_everyone += f'{user.mention} '
                 if player.gtaudio.registered:
                     gta_everyone += f'{user.mention} '
-            else:
-                print(f'Failed to mention user {player.name}')
         await gtg_channel.send(f'{gtg_everyone}\nIt\'s time to Guess The Game!\nhttps://guessthe.game/')
         await gta_channel.send(f'{gta_everyone}\nIt\'s time to Guess The Audio!\nhttps://guesstheaudio.com/')
 
