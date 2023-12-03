@@ -20,6 +20,20 @@ def get_time():
     return hour, minute
 
 
+def get_log_time():
+    time = datetime.datetime.now().astimezone()
+    output = ''
+    if time.hour < 10:
+        output += '0'
+    output += f'{time.hour}:'
+    if time.minute < 10:
+        output += '0'
+    output += f'{time.minute}:'
+    if time.second < 10:
+        output += '0'
+    output += f'{time.second}'
+    return output
+
 
 def get_gtg_guesses(player):
     return player.gtgame.guesses
@@ -42,7 +56,9 @@ def main():
             self.gta_text_channel = 0
             self.server_id = 0
             self.players = []
-            self.scored_today = False
+            self.midnight_called = False
+            self.scored_gtg_today = False
+            self.scored_gta_today = False
             self.tree = app_commands.CommandTree(self)
 
 
@@ -51,6 +67,7 @@ def main():
             def __init__(self):
                 self.winCount = 0
                 self.guesses = 0
+                self.skip = False
                 self.registered = False
                 self.completedToday = False
                 self.succeededToday = False
@@ -70,20 +87,22 @@ def main():
         def read_json_file(self):
             '''Reads player information from the json file and puts it in the players list'''
             if not os.path.exists(self.FILE_PATH):
-                print(f'{self.FILE_PATH} does not exist')
+                print(f'{get_log_time()}> {self.FILE_PATH} does not exist')
                 return
             with open(self.FILE_PATH, 'r', encoding='utf-8') as file:
-                print(f'Reading {self.FILE_PATH}')
+                print(f'{get_log_time()}> Reading {self.FILE_PATH}')
                 data = json.load(file)
                 for firstField, secondField in data.items():
                     if firstField == 'text_channels':
                         self.gtg_text_channel = secondField['gtg_text_channel']
                         self.gta_text_channel = secondField['gta_text_channel']
-                        print(f'Got GTG text channel id of {self.gtg_text_channel}')
-                        print(f'Got GTA text channel id of {self.gta_text_channel}')
+                        print(f'{get_log_time()}> Got GTG text channel id of {self.gtg_text_channel}')
+                        print(f'{get_log_time()}> Got GTA text channel id of {self.gta_text_channel}')
                     elif firstField == 'scored_today':
-                        self.scored_today = secondField['scored_today']
-                        print(f'Got scored_today as {self.scored_today}')
+                        self.scored_gtg_today = secondField['scored_gtg_today']
+                        self.scored_gta_today = secondField['scored_gta_today']
+                        print(f'{get_log_time()}> Got scored_gtg_today as {self.scored_gtg_today}')
+                        print(f'{get_log_time()}> Got scored_gta_today as {self.scored_gta_today}')
                     else:
                         load_player = self.Player(firstField)
                         load_player.gtgame.winCount = secondField['gtgame']['winCount']
@@ -97,14 +116,14 @@ def main():
                         load_player.gtaudio.completedToday = secondField['gtaudio']['completedToday']
                         load_player.gtaudio.succeededToday = secondField['gtaudio']['succeededToday']
                         self.players.append(load_player)
-                        print(f'Loaded player {load_player.name} - '
+                        print(f'{get_log_time()}> Loaded player {load_player.name} - '
                               f'gtg/gta win count: {load_player.gtgame.winCount}/{load_player.gtaudio.winCount}, '
                               f'gtg/gta guesses today: {load_player.gtgame.guesses}/{load_player.gtaudio.guesses}, '
                               f'gtg/gta registered: {load_player.gtgame.registered}/{load_player.gtaudio.registered}, '
                               f'gtg/gta completed today: {load_player.gtgame.completedToday}/{load_player.gtaudio.completedToday}, '
                               f'gtg/gta succeeded today: {load_player.gtgame.succeededToday}/{load_player.gtaudio.succeededToday}')
 
-                print(f'Successfully loaded {self.FILE_PATH}')
+                print(f'{get_log_time()}> Successfully loaded {self.FILE_PATH}')
 
 
         def write_json_file(self):
@@ -112,7 +131,8 @@ def main():
             data = {}
             data['text_channels'] = {'gtg_text_channel': self.gtg_text_channel,
                                      'gta_text_channel': self.gta_text_channel}
-            data['scored_today'] = {'scored_today': client.scored_today}
+            data['scored_today'] = {'scored_gtg_today': client.scored_gtg_today,
+                                    'scored_gta_today': client.scored_gta_today}
             for player in self.players:
                 data[player.name] = {
                     'gtgame': {'winCount': player.gtgame.winCount,
@@ -127,15 +147,47 @@ def main():
                                'succeededToday': player.gtaudio.succeededToday}
                 }
             json_data = json.dumps(data)
-            print(f'Writing {self.FILE_PATH}')
+            print(f'{get_log_time()}> Writing {self.FILE_PATH}')
             with open(self.FILE_PATH, 'w+', encoding='utf-8') as file:
                 file.write(json_data)
+
+
+        async def might_gtg_score(self, channel):
+            if channel.id == int(client.gtg_text_channel):
+                scoreGTG = True
+                for player in client.players:
+                    if player.gtgame.registered and not player.gtgame.skip and not player.gtgame.completedToday:
+                        scoreGTG = False
+                if scoreGTG:
+                    scoreboard = ''
+                    scoreboardList = client.tally_gtg_scores()
+                    for line in scoreboardList:
+                        scoreboard += line
+                    await channel.send(scoreboard)
+            else:
+                print(f'{get_log_time()}> Text channel with id {channel.id} doesn\'t match saved gtg text channel id')
+
+
+        async def might_gta_score(self, channel):
+            if channel.id == int(client.gta_text_channel):
+                scoreGTA = True
+                for player in client.players:
+                    if player.gtaudio.registered and not player.gtaudio.skip and not player.gtaudio.completedToday:
+                        scoreGTA = False
+                if scoreGTA:
+                    scoreboard = ''
+                    scoreboardList = client.tally_gta_scores()
+                    for line in scoreboardList:
+                        scoreboard += line
+                    await channel.send(scoreboard)
+            else:
+                print(f'{get_log_time()}> Text channel with id {channel.id} doesn\'t match saved gta text channel id')
 
 
         async def process(self, name, message: discord.Message, channel: discord.TextChannel, guessThe: GuessThe):
             # player has already sent results
             if guessThe.completedToday:
-                print(f'{name} tried to resubmit results')
+                print(f'{get_log_time()}> {name} tried to resubmit results')
                 await channel.send(f'{name}, you have already submitted your results today.')
                 return
 
@@ -150,32 +202,12 @@ def main():
                     guessThe.guesses += 1
                     guessThe.succeededToday = True
                     break
-            print(f'Player {name} - guesses: {guessThe.guesses}, succeeded: {guessThe.succeededToday}')
+            print(f'{get_log_time()}> Player {name} - guesses: {guessThe.guesses}, succeeded: {guessThe.succeededToday}')
 
             client.write_json_file()
 
-            scoreGTG = True
-            scoreGTA = True
-            for player in client.players:
-                if channel.id == int(client.gtg_text_channel) and player.gtgame.registered and not player.gtgame.completedToday:
-                    scoreGTG = False
-                if channel.id == int(client.gta_text_channel) and player.gtaudio.registered and not player.gtaudio.completedToday:
-                    scoreGTA = False
-
-            if channel.id == int(client.gtg_text_channel) and scoreGTG:
-                scoreboard = ''
-                scoreboardList = client.tally_gtg_scores()
-                for line in scoreboardList:
-                    scoreboard += line
-                await channel.send(scoreboard)
-            if channel.id == int(client.gta_text_channel) and scoreGTA:
-                scoreboard = ''
-                scoreboardList = client.tally_gta_scores()
-                for line in scoreboardList:
-                    scoreboard += line
-                await channel.send(scoreboard)
-            if channel.id != int(client.gtg_text_channel) and channel.id != int(client.gta_text_channel):
-                print(f'Text channel with id {channel.id} doesn\'t match a saved id')
+            await self.might_gtg_score(channel)
+            await self.might_gta_score(channel)
 
 
         def tally_gtg_scores(self):
@@ -185,71 +217,76 @@ def main():
                 return
 
             print('GTG> Tallying scores')
-            winners = [] # list of winners - the one/those with the lowest score
-            losers = [] # list of losers - the strings for people who didn't guess the game
-            results = [] # list of strings - the scoreboard to print out
+            gtgPlayers = [] # list of players    - people who are registered and completed GTG today
+            winners = []    # list of winners    - people with the lowest score
+            completers = [] # list of completers - people who completed it but don't have the lowest score
+            losers = []     # list of losers     - people who didn't guess the game
+            results = []    # list of strings    - scoreboard to print out
             results.append('\nGUESSING COMPLETE!\n\n**SCOREBOARD:**\n')
+            prevGuesses = 0
+            placeCounter = 1
 
-            # sort the players
-            gtg_players = []
+            # cull and sort the players
             for player in self.players:
-                if player.gtgame.registered:
-                    gtg_players.append(player)
-            gtg_players.sort(key=get_gtg_guesses)
-            idx = 0
-            checkPlayer = gtg_players[idx]
-            for player_it in gtg_players:
-                idx += 1
-                if player_it.gtgame.registered:
-                    checkPlayer = player_it
-                    break
-            if checkPlayer.gtgame.succeededToday:
-                # if the player(s) with the lowest score successfully
-                # guessed the game, they are the first winner
-                first_winner = checkPlayer
-                winners.append(first_winner)
-                # for the rest of the players, check if they're tied
-                for player_it in gtg_players[idx:]:
-                    if player_it.gtgame.guesses == first_winner.gtgame.guesses and player_it.gtgame.succeededToday:
-                        winners.append(player_it)
-                    else:
-                        break
+                if player.gtgame.registered and player.gtgame.completedToday:
+                    gtgPlayers.append(player)
+            gtgPlayers.sort(key=get_gtg_guesses)
 
-            place_counter = 1
-            prev_guesses = 0
-            for player in gtg_players:
-                if not player.gtgame.registered:
-                    continue
-                print(f'GTG> {place_counter}. {player.name} ({player.gtgame.winCount} wins) with {player.gtgame.guesses} guesses')
-                if player in winners:
-                    player.gtgame.winCount += 1
-                    if player.gtgame.winCount == 1:
-                        if player.gtgame.guesses == 1:
-                            results.append(f'1. {player.name} (1 win) wins by guessing the game in one guess! Nice!\n')
-                        else:
-                            results.append(f'1. {player.name} (1 win) wins by guessing the game in {player.gtgame.guesses} guesses!\n')
-                    else:
-                        if player.gtgame.guesses == 1:
-                            results.append(f'1. {player.name} ({player.gtgame.winCount} wins) wins by guessing the game in one guess! Nice!\n')
-                        else:
-                            results.append(f'1. {player.name} ({player.gtgame.winCount} wins) wins by guessing the game in {player.gtgame.guesses} guesses!\n')
-                elif player.gtgame.succeededToday:
-                    if player.gtgame.winCount == 1:
-                        results.append(f'{place_counter}. {player.name} (1 win) guessed the game in {player.gtgame.guesses} guesses.\n')
-                    else:
-                        results.append(f'{place_counter}. {player.name} ({player.gtgame.winCount} wins) guessed the game in {player.gtgame.guesses} guesses.\n')
+            # generate winners list
+            if gtgPlayers[0].gtgame.succeededToday:
+                placeCounter = 2
+                winningGuessCount = gtgPlayers[0].gtgame.guesses
+                prevGuesses = winningGuessCount
+                for gtgPlayer in gtgPlayers.copy():
+                    if gtgPlayer.gtgame.guesses == winningGuessCount:
+                        print(f'{get_log_time()}> GTG> {gtgPlayer.name} won with {winningGuessCount} guesses')
+                        winners.append(gtgPlayer)
+                        gtgPlayers.remove(gtgPlayer)
+
+            # generate completers and losers lists
+            for gtgPlayer in gtgPlayers.copy():
+                if gtgPlayer.gtgame.succeededToday:
+                    print(f'{get_log_time()}> GTG> {gtgPlayer.name} completed GTG with {gtgPlayer.gtgame.guesses} guesses')
+                    completers.append(gtgPlayer)
                 else:
-                    if player.gtgame.winCount == 1:
-                        losers.append(f'{player.name} (1 win) did not successfully guess the game.\n')
-                    else:
-                        losers.append(f'{player.name} ({player.gtgame.winCount} wins) did not successfully guess the game.\n')
-                if prev_guesses != player.gtgame.guesses:
-                    place_counter += 1
-                prev_guesses = player.gtgame.guesses
+                    print(f'{get_log_time()}> GTG> {gtgPlayer.name} did not succeed')
+                    losers.append(gtgPlayer)
+                gtgPlayers.remove(gtgPlayer)
+
+            # generate results list
+            for gtgPlayer in winners.copy():
+                subResult = ''
+                gtgPlayer.gtgame.winCount += 1
+                if gtgPlayer.gtgame.winCount == 1:
+                    subResult = f'1. {gtgPlayer.name} (1 win) wins by guessing the game '
+                else:
+                    subResult = f'1. {gtgPlayer.name} ({gtgPlayer.gtgame.winCount} wins) wins by guessing the game '
+                if gtgPlayer.gtgame.guesses == 1:
+                    subResult += f'in one guess! Nice!\n'
+                else:
+                    subResult += f'in {gtgPlayer.gtgame.guesses} guesses!\n'
+                results.append(subResult)
+                winners.remove(gtgPlayer)
+
+            for gtgPlayer in completers.copy():
+                if gtgPlayer.gtgame.winCount == 1:
+                    results.append(f'{placeCounter}. {gtgPlayer.name} (1 win) guessed the game in {gtgPlayer.gtgame.guesses} guesses.\n')
+                else:
+                    results.append(f'{placeCounter}. {gtgPlayer.name} ({gtgPlayer.gtgame.winCount} wins) guessed the game in {gtgPlayer.gtgame.guesses} guesses.\n')
+                if gtgPlayer.gtgame.guesses != prevGuesses:
+                    placeCounter += 1
+                prevGuesses = gtgPlayer.gtgame.guesses
+                completers.remove(gtgPlayer)
+
+            for gtgPlayer in losers.copy():
+                if gtgPlayer.gtgame.winCount == 1:
+                    results.append(f'{gtgPlayer.name} (1 win) did not successfully guess the game.\n')
+                else:
+                    results.append(f'{gtgPlayer.name} ({gtgPlayer.gtgame.winCount} wins) did not successfully guess the game.\n')
+                losers.remove(gtgPlayer)
 
             self.write_json_file()
-
-            return results + losers
+            return results
 
 
         def tally_gta_scores(self):
@@ -259,72 +296,76 @@ def main():
                 return
 
             print('GTA> Tallying scores')
-            winners = [] # list of winners - the one/those with the lowest score
-            losers = [] # list of losers - the strings for people who didn't guess the audio
-            results = [] # list of strings - the scoreboard to print out
+            gtaPlayers = [] # list of players    - people who are registered and completed GTA today
+            winners = []    # list of winners    - people with the lowest score
+            completers = [] # list of completers - people who completed it but don't have the lowest score
+            losers = []     # list of losers     - people who didn't guess the audio
+            results = []    # list of strings    - scoreboard to print out
             results.append('\nGUESSING COMPLETE!\n\n**SCOREBOARD:**\n')
+            prevGuesses = 0
+            placeCounter = 1
 
-            # sort the players
-            gta_players = []
+            # cull and sort the players
             for player in self.players:
-                if player.gtaudio.registered:
-                    gta_players.append(player)
-            gta_players.sort(key=get_gta_guesses)
-            idx = 0
-            checkPlayer = gta_players[idx]
-            for player_it in gta_players:
-                idx += 1
-                if player_it.gtaudio.registered:
-                    checkPlayer = player_it
-                    break
-            if checkPlayer.gtaudio.succeededToday:
-                # if the player(s) with the lowest score successfully
-                # guessed the game, they are the first winner
-                first_winner = checkPlayer
-                winners.append(first_winner)
-                # for the rest of the players, check if they're tied
-                for player_it in gta_players[idx:]:
-                    if player_it.gtaudio.guesses == first_winner.gtaudio.guesses and player_it.gtaudio.succeededToday:
-                        winners.append(player_it)
-                    else:
-                        break
+                if player.gtaudio.registered and player.gtaudio.completedToday:
+                    gtaPlayers.append(player)
+            gtaPlayers.sort(key=get_gta_guesses)
 
-            place_counter = 1
-            prev_guesses = 0
-            for player in gta_players:
-                if not player.gtaudio.registered:
-                    continue
-                print(f'GTA> {place_counter}. {player.name} ({player.gtaudio.winCount} wins) with {player.gtaudio.guesses} guesses')
-                if player in winners:
-                    player.gtaudio.winCount += 1
-                    if player.gtaudio.winCount == 1:
-                        if player.gtaudio.guesses == 1:
-                            results.append(f'1. {player.name} (1 win) wins by guessing the audio in one guess! Nice!\n')
-                        else:
-                            results.append(f'1. {player.name} (1 win) wins by guessing the audio in {player.gtaudio.guesses} guesses!\n')
-                    else:
-                        if player.gtaudio.guesses == 1:
-                            results.append(f'1. {player.name} ({player.gtaudio.winCount} wins) wins by guessing the audio in one guess! Nice!\n')
-                        else:
-                            results.append(f'1. {player.name} ({player.gtaudio.winCount} wins) wins by guessing the audio in {player.gtaudio.guesses} guesses!\n')
-                elif player.gtaudio.succeededToday:
-                    if player.gtaudio.winCount == 1:
-                        results.append(f'{place_counter}. {player.name} (1 win) guessed the audio in {player.gtaudio.guesses} guesses.\n')
-                    else:
-                        results.append(f'{place_counter}. {player.name} ({player.gtaudio.winCount} wins) guessed the audio in {player.gtaudio.guesses} guesses.\n')
+            # generate winners list
+            if gtaPlayers[0].gtaudio.succeededToday:
+                placeCounter = 2
+                winningGuessCount = gtaPlayers[0].gtaudio.guesses
+                prevGuesses = winningGuessCount
+                for gtaPlayer in gtaPlayers.copy():
+                    if gtaPlayer.gtaudio.guesses == winningGuessCount:
+                        print(f'{get_log_time()}> GTA> {gtaPlayer.name} won with {winningGuessCount} guesses')
+                        winners.append(gtaPlayer)
+                        gtaPlayers.remove(gtaPlayer)
+
+            # generate completers and losers lists
+            for gtaPlayer in gtaPlayers.copy():
+                if gtaPlayer.gtaudio.succeededToday:
+                    print(f'{get_log_time()}> GTA> {gtaPlayer.name} completed GTA with {gtaPlayer.gtaudio.guesses} guesses')
+                    completers.append(gtaPlayer)
                 else:
-                    if player.gtaudio.winCount == 1:
-                        losers.append(f'{player.name} (1 win) did not successfully guess the audio.\n')
-                    else:
-                        losers.append(f'{player.name} ({player.gtaudio.winCount} wins) did not successfully guess the audio.\n')
-                if prev_guesses != player.gtaudio.guesses:
-                    place_counter += 1
-                prev_guesses = player.gtaudio.guesses
+                    print(f'{get_log_time()}> GTA> {gtaPlayer.name} did not succeed')
+                    losers.append(gtaPlayer)
+                gtaPlayers.remove(gtaPlayer)
+
+            # generate results list
+            for gtaPlayer in winners.copy():
+                subResult = ''
+                gtaPlayer.gtaudio.winCount += 1
+                if gtaPlayer.gtaudio.winCount == 1:
+                    subResult = f'1. {gtaPlayer.name} (1 win) wins by guessing the audio '
+                else:
+                    subResult = f'1. {gtaPlayer.name} ({gtaPlayer.gtaudio.winCount} wins) wins by guessing the audio '
+                if gtaPlayer.gtaudio.guesses == 1:
+                    subResult += f'in one guess! Nice!\n'
+                else:
+                    subResult += f'in {gtaPlayer.gtaudio.guesses} guesses!\n'
+                results.append(subResult)
+                winners.remove(gtaPlayer)
+
+            for gtaPlayer in completers.copy():
+                if gtaPlayer.gtaudio.winCount == 1:
+                    results.append(f'{placeCounter}. {gtaPlayer.name} (1 win) guessed the audio in {gtaPlayer.gtaudio.guesses} guesses.\n')
+                else:
+                    results.append(f'{placeCounter}. {gtaPlayer.name} ({gtaPlayer.gtaudio.winCount} wins) guessed the audio in {gtaPlayer.gtaudio.guesses} guesses.\n')
+                if gtaPlayer.gtaudio.guesses != prevGuesses:
+                    placeCounter += 1
+                prevGuesses = gtaPlayer.gtaudio.guesses
+                completers.remove(gtaPlayer)
+
+            for gtaPlayer in losers.copy():
+                if gtaPlayer.gtaudio.winCount == 1:
+                    results.append(f'{gtaPlayer.name} (1 win) did not successfully guess the audio.\n')
+                else:
+                    results.append(f'{gtaPlayer.name} ({gtaPlayer.gtaudio.winCount} wins) did not successfully guess the audio.\n')
+                losers.remove(gtaPlayer)
 
             self.write_json_file()
-
-            return results + losers
-
+            return results
 
 
     discord_token = os.getenv('DISCORD_TOKEN')
@@ -339,7 +380,7 @@ def main():
         client.read_json_file()
         if not midnight_call.is_running():
             midnight_call.start()
-        print(f'{client.user} has connected to Discord!')
+        print(f'{get_log_time()}> {client.user} has connected to Discord!')
 
 
     @client.event
@@ -383,7 +424,7 @@ def main():
                 return
 
         if '#GuessTheGame' in message.content:
-            print(f'Received GuessTheGame message from {message.author}')
+            print(f'{get_log_time()}> Received GuessTheGame message from {message.author}')
 
             guessThe = player.gtgame
             await client.process(player.name, message, channel, guessThe)
@@ -393,7 +434,7 @@ def main():
             else:
                 await message.add_reaction('👎')
         elif '#GuessTheAudio' in message.content:
-            print(f'Received GuessTheAudio message from {message.author}')
+            print(f'{get_log_time()}> Received GuessTheAudio message from {message.author}')
 
             guessThe = player.gtaudio
             await client.process(player.name, message, channel, guessThe)
@@ -413,7 +454,7 @@ def main():
         if guess_the == 'GuessTheGame' or guess_the == 'All':
             if interaction.channel.id != int(client.gtg_text_channel):
                 client.gtg_text_channel = f'{interaction.channel.id}'
-                print(f'Now tracking channel {client.gtg_text_channel}')
+                print(f'{get_log_time()}> Now tracking channel {client.gtg_text_channel}')
                 client.write_json_file()
                 response += 'Now tracking this channel for GuessTheGame.\n'
             else:
@@ -422,7 +463,7 @@ def main():
         if guess_the == 'GuessTheAudio' or guess_the == 'All':
             if interaction.channel.id != int(client.gta_text_channel):
                 client.gta_text_channel = f'{interaction.channel.id}'
-                print(f'Now tracking channel {client.gta_text_channel}')
+                print(f'{get_log_time()}> Now tracking channel {client.gta_text_channel}')
                 client.write_json_file()
                 response += 'Now tracking this channel for GuessTheAudio.\n'
             else:
@@ -441,16 +482,16 @@ def main():
             for player in client.players:
                 if interaction.user.name.strip() == player.name.strip():
                     if player.gtgame.registered:
-                        print(f'User {interaction.user.name.strip()} attempted to re-register for tracking GTG')
+                        print(f'{get_log_time()}> User {interaction.user.name.strip()} attempted to re-register for tracking GTG')
                         response += 'You are already registered for GuessTheGame tracking!\n'
                     else:
-                        print(f'Registering user {interaction.user.name.strip()} for tracking GTG')
+                        print(f'{get_log_time()}> Registering user {interaction.user.name.strip()} for tracking GTG')
                         player.gtgame.registered = True
                         client.write_json_file()
                         response += 'You have been registered for GuessTheGame tracking.\n'
                     playerFound = True
             if not playerFound:
-                print(f'Registering user {interaction.user.name.strip()} for tracking GTG')
+                print(f'{get_log_time()}> Registering user {interaction.user.name.strip()} for tracking GTG')
                 player_obj = client.Player(interaction.user.name.strip())
                 player_obj.gtgame.registered = True
                 client.players.append(player_obj)
@@ -461,16 +502,16 @@ def main():
             for player in client.players:
                 if interaction.user.name.strip() == player.name.strip():
                     if player.gtaudio.registered:
-                        print(f'User {interaction.user.name.strip()} attempted to re-register for tracking GTA')
+                        print(f'{get_log_time()}> User {interaction.user.name.strip()} attempted to re-register for tracking GTA')
                         response += 'You are already registered for GuessTheAudio tracking!\n'
                     else:
-                        print(f'Registering user {interaction.user.name.strip()} for tracking GTA')
+                        print(f'{get_log_time()}> Registering user {interaction.user.name.strip()} for tracking GTA')
                         player.gtaudio.registered = True
                         client.write_json_file()
                         response += 'You have been registered for GuessTheAudio tracking.\n'
                     playerFound = True
             if not playerFound:
-                print(f'Creating player object and registering user {interaction.user.name.strip()} for tracking GTA')
+                print(f'{get_log_time()}> Creating player object and registering user {interaction.user.name.strip()} for tracking GTA')
                 player_obj = client.Player(interaction.user.name.strip())
                 player_obj.gtaudio.registered = True
                 client.players.append(player_obj)
@@ -484,7 +525,7 @@ def main():
     async def deregister_command(interaction, guess_the: Literal['GuessTheGame', 'GuessTheAudio', 'All']):
         '''Command to deregister a player'''
         players_copy = client.players.copy()
-        if guess_the == 'GuessTheGame' or guess_the == 'All':
+        if guess_the == 'GuessTheGame':
             for player in players_copy:
                 if player.name == interaction.user.name.strip():
                     if player.gtaudio.registered:
@@ -492,12 +533,13 @@ def main():
                     else:
                         client.players.remove(player)
                     client.write_json_file()
-                    print(f'Deregistered user {player.name} from GTG')
+                    print(f'{get_log_time()}> Deregistered user {player.name} from GTG')
                     await interaction.response.send_message('You have been deregistered for GuessTheGame tracking.')
+                    await client.might_gtg_score(interaction.channel)
                     return
-            print(f'Unregistered user {interaction.user.name.strip()} attempted to deregister from GTG')
+            print(f'{get_log_time()}> Unregistered user {interaction.user.name.strip()} attempted to deregister from GTG')
             await interaction.response.send_message('You were already unregistered for GuessTheGame tracking.')
-        if guess_the == 'GuessTheAudio' or guess_the == 'All':
+        elif guess_the == 'GuessTheAudio':
             for player in players_copy:
                 if player.name == interaction.user.name.strip():
                     if player.gtgame.registered:
@@ -505,39 +547,118 @@ def main():
                     else:
                         client.players.remove(player)
                     client.write_json_file()
-                    print(f'Deregistered user {player.name} from GTA')
+                    print(f'{get_log_time()}> Deregistered user {player.name} from GTA')
                     await interaction.response.send_message('You have been deregistered for GuessTheAudio tracking.')
+                    await client.might_gta_score(interaction.channel)
                     return
-            print(f'Unregistered user {interaction.user.name.strip()} attempted to deregister from GTA')
+            print(f'{get_log_time()}> Unregistered user {interaction.user.name.strip()} attempted to deregister from GTA')
             await interaction.response.send_message('You were already unregistered for GuessTheAudio tracking.')
+        elif guess_the == 'All':
+            for player in players_copy:
+                if player.name == interaction.user.name.strip():
+                    client.players.remove(player)
+                    client.write_json_file()
+                    print(f'{get_log_time()}> Deregistered user {player.name} from GTG and GTA')
+                    await interaction.response.send_message('You have been deregistered for GuessTheGame and GuessTheAudio tracking.')
+                    await client.might_gtg_score(interaction.channel)
+                    await client.might_gta_score(interaction.channel)
+                    return
+            print(f'{get_log_time()}> Unregistered user {interaction.user.name.strip()} attempted to deregister from GTG and GTA')
+            await interaction.response.send_message('You were already unregistered for GuessThe tracking.')
+
+
+    @client.tree.command(name='skip', description='Skip yourself for scoring today.')
+    @app_commands.describe(guess_the='Choose the GuessThe you want to skip today')
+    async def skip_command(interaction, guess_the: Literal['GuessTheGame', 'GuessTheAudio', 'All']):
+        '''Command to skip scoring for today'''
+        if guess_the == 'GuessTheGame':
+            if client.scored_gtg_today:
+                return
+            for player in client.players:
+                if player.name == interaction.author.name:
+                    if player.gtgame.registered:
+                        player.gtgame.skip = True
+                        await interaction.response.send_message('You will be skipped for today\'s GuessTheGame scoring.')
+                        await client.might_gtg_score(interaction.channel)
+                    else:
+                        await interaction.response.send_message('You are unregistered for GuessTheGame scoring; no need to skip.')
+                    return
+        elif guess_the == 'GuessTheAudio':
+            if client.scored_gta_today:
+                return
+            for player in client.players:
+                if player.name == interaction.author.name:
+                    if player.gtaudio.registered:
+                        player.gtaudio.skip = True
+                        await interaction.response.send_message('You will be skipped for today\'s GuessTheAudio scoring.')
+                        await client.might_gta_score(interaction.channel)
+                    else:
+                        await interaction.response.send_message('You are unregistered for GuessTheAudio scoring; no need to skip.')
+                    return
+        elif guess_the == 'All':
+            for player in client.players:
+                if player.name == interaction.author.name:
+                    if not client.scored_gtg_today:
+                        if player.gtgame.registered:
+                            player.gtaudio.skip = True
+                            await interaction.response.send_message('You will be skipped for today\'s GuessTheGame scoring.')
+                            await client.might_gtg_score(interaction.channel)
+                        else:
+                            await interaction.response.send_message('You are unregistered for GuessTheGame scoring; no need to skip.')
+                    if not client.scored_gta_today:
+                        if player.gtaudio.registered:
+                            player.gtaudio.skip = True
+                            await interaction.response.send_message('You will be skipped for today\'s GuessTheAudio scoring.')
+                            await client.might_gta_score(interaction.channel)
+                        else:
+                            await interaction.response.send_message('You are unregistered for GuessTheAudio scoring; no need to skip.')
+                return
 
 
     @tasks.loop(seconds = 1)
     async def midnight_call():
         '''Midnight call loop task that is run every second with an almost midnight check.'''
-
-        hours, minutes = get_time()
-        if client.scored_today and hours == 23 and minutes == 31:
-            client.scored_today = False
-        if hours != 23 or minutes != 30 or client.scored_today:
-            return
-        client.scored_today = True
-
-        print('It is almost midnight, sending daily scoreboard and then mentioning registered players')
-
         if not client.players:
             return
 
         gtg_channel = client.get_channel(int(client.gtg_text_channel))
         gta_channel = client.get_channel(int(client.gta_text_channel))
+
+        hour, minute = get_time()
+        if hour == 22 and minute == 30:
+            if not client.scored_gtg_today:
+                gtg_warning = ''
+                for player in client.players:
+                    if player.gtgame.registered and not player.gtgame.skip and not player.gtgame.completedToday:
+                        user = discord.utils.get(client.users, name=player.name)
+                        gtg_warning += f'{user.mention} '
+                if gtg_warning != '':
+                    await gtg_channel.send(f'{gtg_warning}, you have one hour left to Guess the Game!')
+            if not client.scored_gta_today:
+                gta_warning = ''
+                for player in client.players:
+                    if player.gtaudio.registered and not player.gtaudio.skip and not player.gtaudio.completedToday:
+                        user = discord.utils.get(client.users, name=player.name)
+                        gta_warning += f'{user.mention} '
+                if gta_warning != '':
+                    await gta_channel.send(f'{gta_warning}, you have one hour left to Guess the Audio!')
+
+        if client.midnight_called and hour == 23 and minute == 31:
+            client.midnight_called = False
+        if client.midnight_called or hour != 23 or minute != 30:
+            return
+        client.midnight_called = True
+
+        print('It is almost midnight, sending daily scoreboard and then mentioning registered players')
+
         gtg_shamed = ''
         gta_shamed = ''
         for player in client.players:
-            if player.gtgame.registered and not player.gtgame.completedToday:
+            if player.gtgame.registered and not player.gtgame.skip and not player.gtgame.completedToday:
                 user = discord.utils.get(client.users, name=player.name)
                 if user:
                     gtg_shamed += f'{user.mention} '
-            if player.gtaudio.registered and not player.gtaudio.completedToday:
+            if player.gtaudio.registered and not player.gtaudio.skip and not player.gtaudio.completedToday:
                 user = discord.utils.get(client.users, name=player.name)
                 if user:
                     gta_shamed += f'{user.mention} '
@@ -555,6 +676,8 @@ def main():
         for player in client.players:
             player.gtgame.guesses = 0
             player.gtaudio.guesses = 0
+            player.gtgame.skip = False
+            player.gtaudio.skip = False
             player.gtgame.completedToday = False
             player.gtaudio.completedToday = False
             player.gtgame.succeededToday = False
