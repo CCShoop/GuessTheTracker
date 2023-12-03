@@ -229,9 +229,7 @@ def main():
 
             # generate winners list
             if gtgPlayers[0].gtgame.succeededToday:
-                placeCounter = 2
                 winningGuessCount = gtgPlayers[0].gtgame.guesses
-                prevGuesses = winningGuessCount
                 for gtgPlayer in gtgPlayers.copy():
                     if gtgPlayer.gtgame.guesses == winningGuessCount:
                         print(f'{get_log_time()}> GTG> {gtgPlayer.name} won with {winningGuessCount} guesses')
@@ -264,13 +262,13 @@ def main():
                 winners.remove(gtgPlayer)
 
             for gtgPlayer in completers.copy():
+                if gtgPlayer.gtgame.guesses != prevGuesses:
+                    placeCounter += 1
+                prevGuesses = gtgPlayer.gtgame.guesses
                 if gtgPlayer.gtgame.winCount == 1:
                     results.append(f'{placeCounter}. {gtgPlayer.name} (1 win) guessed the game in {gtgPlayer.gtgame.guesses} guesses.\n')
                 else:
                     results.append(f'{placeCounter}. {gtgPlayer.name} ({gtgPlayer.gtgame.winCount} wins) guessed the game in {gtgPlayer.gtgame.guesses} guesses.\n')
-                if gtgPlayer.gtgame.guesses != prevGuesses:
-                    placeCounter += 1
-                prevGuesses = gtgPlayer.gtgame.guesses
                 completers.remove(gtgPlayer)
 
             for gtgPlayer in losers.copy():
@@ -309,9 +307,7 @@ def main():
 
             # generate winners list
             if gtaPlayers[0].gtaudio.succeededToday:
-                placeCounter = 2
                 winningGuessCount = gtaPlayers[0].gtaudio.guesses
-                prevGuesses = winningGuessCount
                 for gtaPlayer in gtaPlayers.copy():
                     if gtaPlayer.gtaudio.guesses == winningGuessCount:
                         print(f'{get_log_time()}> GTA> {gtaPlayer.name} won with {winningGuessCount} guesses')
@@ -344,13 +340,13 @@ def main():
                 winners.remove(gtaPlayer)
 
             for gtaPlayer in completers.copy():
+                if gtaPlayer.gtaudio.guesses != prevGuesses:
+                    placeCounter += 1
+                prevGuesses = gtaPlayer.gtaudio.guesses
                 if gtaPlayer.gtaudio.winCount == 1:
                     results.append(f'{placeCounter}. {gtaPlayer.name} (1 win) guessed the audio in {gtaPlayer.gtaudio.guesses} guesses.\n')
                 else:
                     results.append(f'{placeCounter}. {gtaPlayer.name} ({gtaPlayer.gtaudio.winCount} wins) guessed the audio in {gtaPlayer.gtaudio.guesses} guesses.\n')
-                if gtaPlayer.gtaudio.guesses != prevGuesses:
-                    placeCounter += 1
-                prevGuesses = gtaPlayer.gtaudio.guesses
                 completers.remove(gtaPlayer)
 
             for gtaPlayer in losers.copy():
