@@ -154,29 +154,29 @@ def main():
 
 
         async def might_gtg_score(self):
-            scoreGTG = True
+            if self.scored_gtg_today:
+                return
             for player in client.players:
                 if player.gtgame.registered and not player.gtgame.skip and not player.gtgame.completedToday:
-                    scoreGTG = False
-            if scoreGTG:
-                scoreboard = ''
-                scoreboardList = client.tally_gtg_scores()
-                for line in scoreboardList:
-                    scoreboard += line
-                await client.gtg_text_channel.send(scoreboard)
+                    return
+            scoreboard = ''
+            scoreboardList = client.tally_gtg_scores()
+            for line in scoreboardList:
+                scoreboard += line
+            await client.gtg_text_channel.send(scoreboard)
 
 
         async def might_gta_score(self):
-            scoreGTA = True
+            if self.scored_gta_today:
+                return
             for player in client.players:
                 if player.gtaudio.registered and not player.gtaudio.skip and not player.gtaudio.completedToday:
-                    scoreGTA = False
-            if scoreGTA:
-                scoreboard = ''
-                scoreboardList = client.tally_gta_scores()
-                for line in scoreboardList:
-                    scoreboard += line
-                await client.gta_text_channel.send(scoreboard)
+                    return
+            scoreboard = ''
+            scoreboardList = client.tally_gta_scores()
+            for line in scoreboardList:
+                scoreboard += line
+            await client.gta_text_channel.send(scoreboard)
 
 
         async def process(self, name, message: discord.Message, channel: discord.TextChannel, guessThe: GuessThe):
@@ -186,23 +186,26 @@ def main():
                 await channel.send(f'{name}, you have already submitted your results today.')
                 return
 
-            result = message.content.splitlines()[2].replace(' ', '')[1:]
-            guessThe.completedToday = True
-            guessThe.succeededToday = False
-            guessThe.guesses = 0
-            for char in result:
-                if char == '🟥' or char == '🟨':
-                    guessThe.guesses += 1
-                elif char == '🟩':
-                    guessThe.guesses += 1
-                    guessThe.succeededToday = True
-                    break
-            print(f'{get_log_time()}> Player {name} - guesses: {guessThe.guesses}, succeeded: {guessThe.succeededToday}')
+            try:
+                result = message.content.splitlines()[2].replace(' ', '')[1:]
+                guessThe.succeededToday = False
+                guessThe.guesses = 0
+                for char in result:
+                    if char == '🟥' or char == '🟨':
+                        guessThe.guesses += 1
+                    elif char == '🟩':
+                        guessThe.guesses += 1
+                        guessThe.succeededToday = True
+                        break
+                guessThe.completedToday = True
+                print(f'{get_log_time()}> Player {name} - guesses: {guessThe.guesses}, succeeded: {guessThe.succeededToday}')
 
-            client.write_json_file()
-
-            await self.might_gtg_score()
-            await self.might_gta_score()
+                client.write_json_file()
+                await self.might_gtg_score()
+                await self.might_gta_score()
+            except:
+                print(f'{get_log_time()}> Player {name} submitted an invalid GuessThe results message')
+                channel.send(f'{name}, your results message had a formatting error and could not be processed.')
 
 
         def tally_gtg_scores(self):
@@ -262,6 +265,7 @@ def main():
                 winners.remove(gtgPlayer)
 
             for gtgPlayer in completers.copy():
+                print(f'{get_log_time()}> DEBUG: name: {gtgPlayer.name}, guesses: {gtgPlayer.gtgame.guesses}, prevGuesses: {prevGuesses}')
                 if gtgPlayer.gtgame.guesses != prevGuesses:
                     placeCounter += 1
                 prevGuesses = gtgPlayer.gtgame.guesses
