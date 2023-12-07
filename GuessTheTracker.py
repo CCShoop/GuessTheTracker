@@ -57,6 +57,7 @@ def main():
             self.gta_text_channel: discord.TextChannel
             self.server_id:int                 = 0
             self.players:list                  = []
+            self.sent_warning:bool             = False
             self.midnight_called:bool          = False
             self.scored_gtg_today:bool         = False
             self.scored_gta_today:bool         = False
@@ -566,7 +567,7 @@ def main():
                 await interaction.response.send_message('GuessTheGame was already scored today.')
                 return
             for player in client.players:
-                if player.name == interaction.author.name:
+                if player.name == interaction.user.name:
                     if player.gtgame.registered:
                         player.gtgame.skip = True
                         await interaction.response.send_message('You will be skipped for today\'s GuessTheGame scoring.')
@@ -579,7 +580,7 @@ def main():
                 await interaction.response.send_message('GuessTheAudio was already scored today.')
                 return
             for player in client.players:
-                if player.name == interaction.author.name:
+                if player.name == interaction.user.name:
                     if player.gtaudio.registered:
                         player.gtaudio.skip = True
                         await interaction.response.send_message('You will be skipped for today\'s GuessTheAudio scoring.')
@@ -589,7 +590,7 @@ def main():
                     return
         elif guess_the == 'All':
             for player in client.players:
-                if player.name == interaction.author.name:
+                if player.name == interaction.user.name:
                     response = ''
                     if client.scored_gtg_today:
                         response += 'GuessTheGame was already scored today.\n'
@@ -622,7 +623,7 @@ def main():
                 await interaction.response.send_message('GuessTheGame was already scored today.')
                 return
             for player in client.players:
-                if player.name == interaction.author.name:
+                if player.name == interaction.user.name:
                     if player.gtgame.registered:
                         player.gtgame.skip = False
                         await interaction.response.send_message('You will **not** be skipped for today\'s GuessTheGame scoring.')
@@ -635,7 +636,7 @@ def main():
                 await interaction.response.send_message('GuessTheAudio was already scored today.')
                 return
             for player in client.players:
-                if player.name == interaction.author.name:
+                if player.name == interaction.user.name:
                     if player.gtaudio.registered:
                         player.gtaudio.skip = False
                         await interaction.response.send_message('You will **not** be skipped for today\'s GuessTheAudio scoring.')
@@ -645,7 +646,7 @@ def main():
                     return
         elif guess_the == 'All':
             for player in client.players:
-                if player.name == interaction.author.name:
+                if player.name == interaction.user.name:
                     response = ''
                     if client.scored_gtg_today:
                         response += 'GuessTheGame was already scored today.\n'
@@ -676,7 +677,9 @@ def main():
             return
 
         hour, minute = get_time()
-        if hour == 22 and minute == 30:
+        if hour == 22 and minute == 31 and client.sent_warning:
+            client.sent_warning = False
+        if hour == 22 and minute == 30 and not client.sent_warning:
             if not client.scored_gtg_today:
                 gtg_warning = ''
                 for player in client.players:
@@ -693,6 +696,7 @@ def main():
                         gta_warning += f'{user.mention} '
                 if gta_warning != '':
                     await client.gta_text_channel.send(f'{gta_warning}, you have one hour left to Guess the Audio!')
+            client.sent_warning = True
 
         if client.midnight_called and hour == 23 and minute == 31:
             client.midnight_called = False
