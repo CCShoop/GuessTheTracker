@@ -206,7 +206,7 @@ def main():
                 await self.might_gta_score()
             except:
                 print(f'{get_log_time()}> Player {name} submitted an invalid GuessThe results message')
-                channel.send(f'{name}, your results message had a formatting error and could not be processed.')
+                await channel.send(f'{name}, your results message had a formatting error and could not be processed.')
 
 
         def tally_gtg_scores(self):
