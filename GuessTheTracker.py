@@ -235,7 +235,7 @@ def main():
             if gtgPlayers[0].gtgame.succeededToday:
                 winningGuessCount = gtgPlayers[0].gtgame.guesses
                 for gtgPlayer in gtgPlayers.copy():
-                    if gtgPlayer.gtgame.guesses == winningGuessCount:
+                    if gtgPlayer.gtgame.guesses == winningGuessCount and gtgPlayer.succeededToday:
                         print(f'{get_log_time()}> GTG> {gtgPlayer.name} won with {winningGuessCount} guesses')
                         winners.append(gtgPlayer)
                         gtgPlayers.remove(gtgPlayer)
@@ -314,7 +314,7 @@ def main():
             if gtaPlayers[0].gtaudio.succeededToday:
                 winningGuessCount = gtaPlayers[0].gtaudio.guesses
                 for gtaPlayer in gtaPlayers.copy():
-                    if gtaPlayer.gtaudio.guesses == winningGuessCount:
+                    if gtaPlayer.gtaudio.guesses == winningGuessCount and gtaPlayer.succeededToday:
                         print(f'{get_log_time()}> GTA> {gtaPlayer.name} won with {winningGuessCount} guesses')
                         winners.append(gtaPlayer)
                         gtaPlayers.remove(gtaPlayer)
@@ -700,6 +700,7 @@ def main():
 
         if client.midnight_called and hour == 23 and minute == 31:
             client.midnight_called = False
+            client.write_json_file()
         if client.midnight_called or hour != 23 or minute != 30:
             return
         client.midnight_called = True
