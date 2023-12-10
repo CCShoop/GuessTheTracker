@@ -235,7 +235,7 @@ def main():
             if gtgPlayers[0].gtgame.succeededToday:
                 winningGuessCount = gtgPlayers[0].gtgame.guesses
                 for gtgPlayer in gtgPlayers.copy():
-                    if gtgPlayer.gtgame.guesses == winningGuessCount and gtgPlayer.succeededToday:
+                    if gtgPlayer.gtgame.guesses == winningGuessCount and gtgPlayer.gtgame.succeededToday:
                         print(f'{get_log_time()}> GTG> {gtgPlayer.name} won with {winningGuessCount} guesses')
                         winners.append(gtgPlayer)
                         gtgPlayers.remove(gtgPlayer)
@@ -314,7 +314,7 @@ def main():
             if gtaPlayers[0].gtaudio.succeededToday:
                 winningGuessCount = gtaPlayers[0].gtaudio.guesses
                 for gtaPlayer in gtaPlayers.copy():
-                    if gtaPlayer.gtaudio.guesses == winningGuessCount and gtaPlayer.succeededToday:
+                    if gtaPlayer.gtaudio.guesses == winningGuessCount and gtaPlayer.gtaudio.succeededToday:
                         print(f'{get_log_time()}> GTA> {gtaPlayer.name} won with {winningGuessCount} guesses')
                         winners.append(gtaPlayer)
                         gtaPlayers.remove(gtaPlayer)
@@ -379,6 +379,8 @@ def main():
         if not midnight_call.is_running():
             midnight_call.start()
         print(f'{get_log_time()}> {client.user} has connected to Discord!')
+        await client.might_gtg_score()
+        await client.might_gta_score()
 
 
     @client.event
