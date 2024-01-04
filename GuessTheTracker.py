@@ -227,10 +227,8 @@ def main():
                 guessThe.guesses = 0
                 for char in result:
                     if char == '🟥' or char == '🟨':
-                        await message.add_reaction(char)
                         guessThe.guesses += 1
                     elif char == '🟩':
-                        await message.add_reaction(char)
                         guessThe.guesses += 1
                         guessThe.succeededToday = True
                         break
