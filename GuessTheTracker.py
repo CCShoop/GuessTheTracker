@@ -285,6 +285,13 @@ def main():
 
             self.scored_gtg_today = True
             self.write_json_file()
+
+            gtgPlayers.clear()
+            winners.clear()
+            completers.clear()
+            losers.clear()
+            results.clear()
+
             return results
 
 
@@ -363,6 +370,13 @@ def main():
 
             self.scored_gta_today = True
             self.write_json_file()
+
+            gtaPlayers.clear()
+            winners.clear()
+            completers.clear()
+            losers.clear()
+            results.clear()
+
             return results
 
 
