@@ -148,7 +148,7 @@ def main():
                                'completedToday': player.gtaudio.completedToday,
                                'succeededToday': player.gtaudio.succeededToday}
                 }
-            json_data = json.dumps(data)
+            json_data = json.dumps(data, indent=4)
             print(f'{get_log_time()}> Writing {self.FILE_PATH}')
             with open(self.FILE_PATH, 'w+', encoding='utf-8') as file:
                 file.write(json_data)
