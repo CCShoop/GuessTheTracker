@@ -494,7 +494,7 @@ def main():
                 try:
                     gameNum = int(message.content.splitlines()[0].split(' ')[1][1:])
                     if gameNum != client.gtg_number:
-                        await channel.send(f'Received results for GTG #{gameNum}; Today should be #{client.gtg_number}.')
+                        await channel.send(f'Received results for GuessTheGame #{gameNum}; Today is #{client.gtg_number}.')
                         return
                 except:
                     print(f'Failed to get gameNum from message, likely invalid')
@@ -502,8 +502,8 @@ def main():
             elif '#GuessTheAudio' in message.content:
                 try:
                     audioNum = int(message.content.splitlines()[0].split(' ')[1][1:])
-                    if audioNum != client.gtg_number:
-                        await channel.send(f'Received results for GTA #{audioNum}; Today should be #{client.gta_number}.')
+                    if audioNum != client.gta_number:
+                        await channel.send(f'Received results for GuessTheAudio #{audioNum}; Today is #{client.gta_number}.')
                         return
                 except:
                     print(f'Failed to get audioNum from message, likely invalid')
