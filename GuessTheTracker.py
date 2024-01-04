@@ -5,7 +5,7 @@ import json
 import discord
 import datetime
 from typing import Literal
-from discord import app_commands
+from discord import app_commands, File, Client, Intents, Message, TextChannel, Interaction, utils
 from discord.ext import tasks
 from dotenv import load_dotenv
 
@@ -46,15 +46,15 @@ def get_gta_guesses(player):
 
 def main():
     '''Main function'''
-    class GuessTheClient(discord.Client):
+    class GuessTheClient(Client):
         '''Custom client class for GuessTheGame bot'''
 
         FILE_PATH = 'info.json'
 
         def __init__(self, intents):
             super(GuessTheClient, self).__init__(intents=intents)
-            self.gtg_text_channel: discord.TextChannel
-            self.gta_text_channel: discord.TextChannel
+            self.gtg_text_channel:TextChannel
+            self.gta_text_channel:TextChannel
             self.gtg_number:int                = 0
             self.gta_number:int                = 0
             self.server_id:int                 = 0
@@ -75,6 +75,7 @@ def main():
                 self.registered = False
                 self.completedToday = False
                 self.succeededToday = False
+                self.filePath = ''
 
         class Player:
             '''Player class for storing player info'''
@@ -163,33 +164,57 @@ def main():
                 file.write(json_data)
 
 
-        async def might_gtg_score(self):
+        async def might_score_gtg(self):
             if self.scored_gtg_today:
                 return
-            for player in client.players:
+            for player in self.players:
                 if player.gtgame.registered and not player.gtgame.skip and not player.gtgame.completedToday:
                     return
+            await self.score_gtg()
+
+
+        async def might_score_gta(self):
+            if self.scored_gta_today:
+                return
+            for player in self.players:
+                if player.gtaudio.registered and not player.gtaudio.skip and not player.gtaudio.completedToday:
+                    return
+            await self.score_gta()
+
+
+        async def score_gtg(self):
             scoreboard = ''
             scoreboardList = client.tally_gtg_scores()
             for line in scoreboardList:
                 scoreboard += line
             await client.gtg_text_channel.send(scoreboard)
-
-
-        async def might_gta_score(self):
-            if self.scored_gta_today:
-                return
             for player in client.players:
-                if player.gtaudio.registered and not player.gtaudio.skip and not player.gtaudio.completedToday:
-                    return
+                if player.gtgame.registered and player.gtgame.filePath != '':
+                    await client.gtg_text_channel.send(content=f'__{player.name}:__', file=File(player.gtgame.filePath))
+                    try:
+                        os.remove(player.gtgame.filePath)
+                    except OSError as e:
+                        print(f'Error deleting {player.gtgame.filePath}: {e}')
+                    player.gtgame.filePath = ''
+
+
+        async def score_gta(self):
             scoreboard = ''
             scoreboardList = client.tally_gta_scores()
             for line in scoreboardList:
                 scoreboard += line
             await client.gta_text_channel.send(scoreboard)
+            for player in client.players:
+                if player.gtaudio.registered and player.gtaudio.filePath != '':
+                    await client.gta_text_channel.send(content=f'__{player.name}:__', file=File(player.gtaudio.filePath))
+                    try:
+                        os.remove(player.gtaudio.filePath)
+                    except OSError as e:
+                        print(f'Error deleting {player.gtaudio.filePath}: {e}')
+                    player.gtaudio.filePath = ''
 
 
-        async def process(self, name, message: discord.Message, channel: discord.TextChannel, guessThe: GuessThe):
+        async def process(self, name, message: Message, channel: TextChannel, guessThe: GuessThe):
             # player has already sent results
             if guessThe.completedToday:
                 print(f'{get_log_time()}> {name} tried to resubmit results')
@@ -230,8 +255,8 @@ def main():
                     await message.add_reaction('👎')
 
                 client.write_json_file()
-                await self.might_gtg_score()
-                await self.might_gta_score()
+                await self.might_score_gtg()
+                await self.might_score_gta()
             except:
                 print(f'{get_log_time()}> Player {name} submitted an invalid GuessThe results message')
                 await channel.send(f'{name}, your results message had a formatting error and could not be processed.')
@@ -407,7 +432,7 @@ def main():
 
     discord_token = os.getenv('DISCORD_TOKEN')
 
-    intents = discord.Intents.all()
+    intents = Intents.all()
 
     client = GuessTheClient(intents=intents)
 
@@ -418,8 +443,8 @@ def main():
         if not midnight_call.is_running():
             midnight_call.start()
         print(f'{get_log_time()}> {client.user} has connected to Discord!')
-        await client.might_gtg_score()
-        await client.might_gta_score()
+        await client.might_score_gtg()
+        await client.might_score_gta()
 
 
     @client.event
@@ -430,7 +455,7 @@ def main():
             return
 
         player = client.players[0]
-        channel: discord.TextChannel
+        channel: TextChannel
         if '#GuessTheGame' in message.content:
             print(f'{get_log_time()}> Received GuessTheGame message from {message.author}')
             channel = client.gtg_text_channel
@@ -440,7 +465,7 @@ def main():
 
         # someone posts their GuessThe results
         if '#GuessTheGame' in message.content or '#GuessTheAudio' in message.content:
-            user = discord.utils.get(client.users, name=message.author.name)
+            user = utils.get(client.users, name=message.author.name)
             # there are no registered players
             if not client.players:
                 await channel.send(f'{user.mention}, there are no registered players! Please register and resend your results to be the first.')
@@ -485,11 +510,31 @@ def main():
                 guessThe = player.gtaudio
 
             await client.process(player.name, message, channel, guessThe)
+        elif not client.scored_gtg_today and message.channel.id == client.gtg_text_channel.id and message.attachments and message.attachments[0].is_spoiler():
+            for player in client.players:
+                if message.author.name == player.name:
+                    if player.gtgame.filePath == '':
+                        await message.delete()
+                        player.gtgame.filePath = f'{message.author.name}_gtg.png'
+                        with open(player.gtgame.filePath, 'wb') as file:
+                            await message.attachments[0].save(file)
+                        await message.channel.send(f'Received GTG image from {message.author.name}. It will be sent after scoring.\n')
+                    break
+        elif not client.scored_gta_today and message.channel.id == client.gta_text_channel.id and message.attachments and message.attachments[0].is_spoiler():
+            for player in client.players:
+                if message.author.name == player.name:
+                    if player.gtaudio.filePath == '':
+                        await message.delete()
+                        player.gtaudio.filePath = f'{message.author.name}_gta.png'
+                        with open(player.gtaudio.filePath, 'wb') as file:
+                            await message.attachments[0].save(file)
+                        await message.channel.send(f'Received GTA image from {message.author.name}. It will be sent after scoring.\n')
+                    break
 
 
     @client.tree.command(name='track', description='Track this text channel for GuessTheGame or GuessTheAudio.')
     @app_commands.describe(guess_the='Choose the GuessThe you want tracked to this channel')
-    async def track_command(interaction: discord.Interaction, guess_the: GUESS_THE_LITERAL):
+    async def track_command(interaction: Interaction, guess_the: GUESS_THE_LITERAL):
         '''Command to track a text channel'''
         response = ''
         client.server_id = interaction.guild.id
@@ -516,7 +561,7 @@ def main():
 
     @client.tree.command(name='register', description='Register for GuessTheGame or GuessTheAudio tracking.')
     @app_commands.describe(guess_the='Choose the GuessThe you want to register for')
-    async def register_command(interaction: discord.Interaction, guess_the: GUESS_THE_LITERAL):
+    async def register_command(interaction: Interaction, guess_the: GUESS_THE_LITERAL):
         '''Command to register a player'''
         response = ''
         if guess_the == 'GuessTheGame' or guess_the == 'All':
@@ -564,7 +609,7 @@ def main():
 
     @client.tree.command(name='deregister', description='Deregister for GuessThe tracking.')
     @app_commands.describe(guess_the='Choose the GuessThe you want to deregister from')
-    async def deregister_command(interaction: discord.Interaction, guess_the: GUESS_THE_LITERAL):
+    async def deregister_command(interaction: Interaction, guess_the: GUESS_THE_LITERAL):
         '''Command to deregister a player'''
         players_copy = client.players.copy()
         if guess_the == 'GuessTheGame':
@@ -577,7 +622,7 @@ def main():
                     client.write_json_file()
                     print(f'{get_log_time()}> Deregistered user {player.name} from GTG')
                     await interaction.response.send_message('You have been deregistered for GuessTheGame tracking.')
-                    await client.might_gtg_score()
+                    await client.might_score_gtg()
                     return
             print(f'{get_log_time()}> Unregistered user {interaction.user.name.strip()} attempted to deregister from GTG')
             await interaction.response.send_message('You were already unregistered for GuessTheGame tracking.')
@@ -591,7 +636,7 @@ def main():
                     client.write_json_file()
                     print(f'{get_log_time()}> Deregistered user {player.name} from GTA')
                     await interaction.response.send_message('You have been deregistered for GuessTheAudio tracking.')
-                    await client.might_gta_score()
+                    await client.might_score_gta()
                     return
             print(f'{get_log_time()}> Unregistered user {interaction.user.name.strip()} attempted to deregister from GTA')
             await interaction.response.send_message('You were already unregistered for GuessTheAudio tracking.')
@@ -602,8 +647,8 @@ def main():
                     client.write_json_file()
                     print(f'{get_log_time()}> Deregistered user {player.name} from GTG and GTA')
                     await interaction.response.send_message('You have been deregistered for GuessTheGame and GuessTheAudio tracking.')
-                    await client.might_gtg_score()
-                    await client.might_gta_score()
+                    await client.might_score_gtg()
+                    await client.might_score_gta()
                     return
             print(f'{get_log_time()}> Unregistered user {interaction.user.name.strip()} attempted to deregister from GTG and GTA')
             await interaction.response.send_message('You were already unregistered for GuessThe tracking.')
@@ -611,7 +656,7 @@ def main():
 
     @client.tree.command(name='skip', description='Skip yourself for scoring today.')
     @app_commands.describe(guess_the='Choose the GuessThe you want to skip today')
-    async def skip_command(interaction: discord.Interaction, guess_the: GUESS_THE_LITERAL = 'All'):
+    async def skip_command(interaction: Interaction, guess_the: GUESS_THE_LITERAL = 'All'):
         '''Command to skip scoring for today'''
         if guess_the == 'GuessTheGame':
             if client.scored_gtg_today:
@@ -622,7 +667,7 @@ def main():
                     if player.gtgame.registered:
                         player.gtgame.skip = True
                         await interaction.response.send_message('You will be skipped for today\'s GuessTheGame scoring.')
-                        await client.might_gtg_score()
+                        await client.might_score_gtg()
                     else:
                         await interaction.response.send_message('You are unregistered for GuessTheGame scoring; no need to skip.')
                     return
@@ -635,7 +680,7 @@ def main():
                     if player.gtaudio.registered:
                         player.gtaudio.skip = True
                         await interaction.response.send_message('You will be skipped for today\'s GuessTheAudio scoring.')
-                        await client.might_gta_score()
+                        await client.might_score_gta()
                     else:
                         await interaction.response.send_message('You are unregistered for GuessTheAudio scoring; no need to skip.')
                     return
@@ -660,14 +705,14 @@ def main():
                         else:
                             response += 'You are unregistered for GuessTheAudio scoring; no need to skip.\n'
                     await interaction.response.send_message(response)
-                    await client.might_gtg_score()
-                    await client.might_gta_score()
+                    await client.might_score_gtg()
+                    await client.might_score_gta()
                     return
 
 
     @client.tree.command(name='unskip', description='Unskip yourself for scoring today.')
     @app_commands.describe(guess_the='Choose the GuessThe you want to unskip today')
-    async def unskip_command(interaction: discord.Interaction, guess_the: GUESS_THE_LITERAL):
+    async def unskip_command(interaction: Interaction, guess_the: GUESS_THE_LITERAL):
         '''Command to unskip scoring for today'''
         if guess_the == 'GuessTheGame':
             if client.scored_gtg_today:
@@ -678,7 +723,7 @@ def main():
                     if player.gtgame.registered:
                         player.gtgame.skip = False
                         await interaction.response.send_message('You will **not** be skipped for today\'s GuessTheGame scoring.')
-                        await client.might_gtg_score()
+                        await client.might_score_gtg()
                     else:
                         await interaction.response.send_message('You are unregistered for GuessTheGame scoring; you need to register to be tracked.')
                     return
@@ -691,7 +736,7 @@ def main():
                     if player.gtaudio.registered:
                         player.gtaudio.skip = False
                         await interaction.response.send_message('You will **not** be skipped for today\'s GuessTheAudio scoring.')
-                        await client.might_gta_score()
+                        await client.might_score_gta()
                     else:
                         await interaction.response.send_message('You are unregistered for GuessTheAudio scoring; you need to register to be tracked.')
                     return
@@ -716,8 +761,8 @@ def main():
                         else:
                             response += 'You are unregistered for GuessTheAudio scoring; you need to register to be tracked.\n'
                     await interaction.response.send_message(response)
-                    await client.might_gtg_score()
-                    await client.might_gta_score()
+                    await client.might_score_gtg()
+                    await client.might_score_gta()
                     return
 
 
@@ -735,7 +780,7 @@ def main():
                 gtg_warning = ''
                 for player in client.players:
                     if player.gtgame.registered and not player.gtgame.skip and not player.gtgame.completedToday:
-                        user = discord.utils.get(client.users, name=player.name)
+                        user = utils.get(client.users, name=player.name)
                         gtg_warning += f'{user.mention} '
                 if gtg_warning != '':
                     await client.gtg_text_channel.send(f'{gtg_warning}, you have one hour left to Guess the Game #{client.gtg_number}!')
@@ -743,7 +788,7 @@ def main():
                 gta_warning = ''
                 for player in client.players:
                     if player.gtaudio.registered and not player.gtaudio.skip and not player.gtaudio.completedToday:
-                        user = discord.utils.get(client.users, name=player.name)
+                        user = utils.get(client.users, name=player.name)
                         gta_warning += f'{user.mention} '
                 if gta_warning != '':
                     await client.gta_text_channel.send(f'{gta_warning}, you have one hour left to Guess the Audio #{client.gta_number}!')
@@ -762,27 +807,19 @@ def main():
         gta_shamed = ''
         for player in client.players:
             if player.gtgame.registered and not player.gtgame.skip and not player.gtgame.completedToday:
-                user = discord.utils.get(client.users, name=player.name)
+                user = utils.get(client.users, name=player.name)
                 if user:
                     gtg_shamed += f'{user.mention} '
             if player.gtaudio.registered and not player.gtaudio.skip and not player.gtaudio.completedToday:
-                user = discord.utils.get(client.users, name=player.name)
+                user = utils.get(client.users, name=player.name)
                 if user:
                     gta_shamed += f'{user.mention} '
         if gtg_shamed != '':
             await client.gtg_text_channel.send(f'SHAME ON {gtg_shamed} FOR NOT ATTEMPTING TO GUESS THE GAME #{client.gtg_number}!')
-            scoreboard = ''
-            scoreboardList = client.tally_gtg_scores()
-            for line in scoreboardList:
-                scoreboard += line
-            await client.gtg_text_channel.send(scoreboard)
+            await client.score_gtg()
         if gta_shamed != '':
             await client.gta_text_channel.send(f'SHAME ON {gta_shamed} FOR NOT ATTEMPTING TO GUESS THE AUDIO #{client.gta_number}!')
-            scoreboard = ''
-            scoreboardList = client.tally_gta_scores()
-            for line in scoreboardList:
-                scoreboard += line
-            await client.gta_text_channel.send(scoreboard)
+            await client.score_gta()
 
         gtg_everyone = ''
         gta_everyone = ''
@@ -795,7 +832,7 @@ def main():
             player.gtaudio.completedToday = False
             player.gtgame.succeededToday = False
             player.gtaudio.succeededToday = False
-            user = discord.utils.get(client.users, name=player.name)
+            user = utils.get(client.users, name=player.name)
             if user:
                 if player.gtgame.registered:
                     gtg_everyone += f'{user.mention} '
