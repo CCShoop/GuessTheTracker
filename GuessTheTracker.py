@@ -266,7 +266,6 @@ def main():
                 winners.remove(gtgPlayer)
 
             for gtgPlayer in completers.copy():
-                print(f'{get_log_time()}> DEBUG: name: {gtgPlayer.name}, guesses: {gtgPlayer.gtgame.guesses}, prevGuesses: {prevGuesses}')
                 if gtgPlayer.gtgame.guesses != prevGuesses:
                     placeCounter += 1
                 prevGuesses = gtgPlayer.gtgame.guesses
@@ -290,7 +289,6 @@ def main():
             winners.clear()
             completers.clear()
             losers.clear()
-            results.clear()
 
             return results
 
@@ -375,7 +373,6 @@ def main():
             winners.clear()
             completers.clear()
             losers.clear()
-            results.clear()
 
             return results
 
@@ -576,7 +573,7 @@ def main():
 
     @client.tree.command(name='skip', description='Skip yourself for scoring today.')
     @app_commands.describe(guess_the='Choose the GuessThe you want to skip today')
-    async def skip_command(interaction: discord.Interaction, guess_the: GUESS_THE_LITERAL):
+    async def skip_command(interaction: discord.Interaction, guess_the: GUESS_THE_LITERAL = 'All'):
         '''Command to skip scoring for today'''
         if guess_the == 'GuessTheGame':
             if client.scored_gtg_today:
