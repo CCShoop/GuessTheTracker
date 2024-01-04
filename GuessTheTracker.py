@@ -55,6 +55,8 @@ def main():
             super(GuessTheClient, self).__init__(intents=intents)
             self.gtg_text_channel: discord.TextChannel
             self.gta_text_channel: discord.TextChannel
+            self.gtg_number:int                = 0
+            self.gta_number:int                = 0
             self.server_id:int                 = 0
             self.players:list                  = []
             self.sent_warning:bool             = False
@@ -100,6 +102,11 @@ def main():
                         self.gta_text_channel = client.get_channel(int(secondField['gta_text_channel']))
                         print(f'{get_log_time()}> Got GTG text channel {self.gtg_text_channel.name} with id {self.gtg_text_channel.id}')
                         print(f'{get_log_time()}> Got GTA text channel {self.gta_text_channel.name} with id {self.gta_text_channel.id}')
+                    elif firstField == 'guessthe_numbers':
+                        self.gtg_number = int(secondField['gtg_number'])
+                        self.gta_number = int(secondField['gta_number'])
+                        print(f'{get_log_time()}> Got GTG number as {self.gtg_number}')
+                        print(f'{get_log_time()}> Got GTA number as {self.gta_number}')
                     elif firstField == 'scored_today':
                         self.scored_gtg_today = secondField['scored_gtg_today']
                         self.scored_gta_today = secondField['scored_gta_today']
@@ -133,6 +140,8 @@ def main():
             data = {}
             data['text_channels'] = {'gtg_text_channel': self.gtg_text_channel.id,
                                      'gta_text_channel': self.gta_text_channel.id}
+            data['guessthe_numbers'] = {'gtg_number': self.gtg_number,
+                                        'gta_number': self.gta_number}
             data['scored_today'] = {'scored_gtg_today': client.scored_gtg_today,
                                     'scored_gta_today': client.scored_gta_today}
             for player in self.players:
@@ -193,13 +202,32 @@ def main():
                 guessThe.guesses = 0
                 for char in result:
                     if char == '🟥' or char == '🟨':
+                        await message.add_reaction(char)
                         guessThe.guesses += 1
                     elif char == '🟩':
+                        await message.add_reaction(char)
                         guessThe.guesses += 1
                         guessThe.succeededToday = True
                         break
                 guessThe.completedToday = True
                 print(f'{get_log_time()}> Player {name} - guesses: {guessThe.guesses}, succeeded: {guessThe.succeededToday}')
+
+                if guessThe.guesses == 1:
+                    await message.add_reaction('1️⃣')
+                elif guessThe.guesses == 2:
+                    await message.add_reaction('2️⃣')
+                elif guessThe.guesses == 3:
+                    await message.add_reaction('3️⃣')
+                elif guessThe.guesses == 4:
+                    await message.add_reaction('4️⃣')
+                elif guessThe.guesses == 5:
+                    await message.add_reaction('5️⃣')
+                elif guessThe.guesses == 6:
+                    await message.add_reaction('6️⃣')
+                if guessThe.succeededToday:
+                    await message.add_reaction('👍')
+                else:
+                    await message.add_reaction('👎')
 
                 client.write_json_file()
                 await self.might_gtg_score()
@@ -433,20 +461,30 @@ def main():
                     player = player_it
             if not found:
                 print('Unregistered player posted a result')
-                await channel.send(f'Unregistered user {user.mention} attempted to post a result. Please register with "/register" and try again.')
+                await channel.send(f'Unregistered user {user.mention} attempted to post a result. Please register with "/register" and try again if you want your results to be tracked.')
                 return
 
             guessThe: GuessTheClient.GuessThe
             if '#GuessTheGame' in message.content:
+                try:
+                    gameNum = int(message.content.splitlines()[0].split(' ')[1][1:])
+                    if gameNum != client.gtg_number:
+                        await channel.send(f'Received results for GTG #{gameNum}; Today should be #{client.gtg_number}.')
+                        return
+                except:
+                    print(f'Failed to get gameNum from message, likely invalid')
                 guessThe = player.gtgame
             elif '#GuessTheAudio' in message.content:
+                try:
+                    audioNum = int(message.content.splitlines()[0].split(' ')[1][1:])
+                    if audioNum != client.gtg_number:
+                        await channel.send(f'Received results for GTA #{audioNum}; Today should be #{client.gta_number}.')
+                        return
+                except:
+                    print(f'Failed to get audioNum from message, likely invalid')
                 guessThe = player.gtaudio
 
             await client.process(player.name, message, channel, guessThe)
-            if guessThe.succeededToday:
-                await message.add_reaction('👍')
-            else:
-                await message.add_reaction('👎')
 
 
     @client.tree.command(name='track', description='Track this text channel for GuessTheGame or GuessTheAudio.')
@@ -700,7 +738,7 @@ def main():
                         user = discord.utils.get(client.users, name=player.name)
                         gtg_warning += f'{user.mention} '
                 if gtg_warning != '':
-                    await client.gtg_text_channel.send(f'{gtg_warning}, you have one hour left to Guess the Game!')
+                    await client.gtg_text_channel.send(f'{gtg_warning}, you have one hour left to Guess the Game #{client.gtg_number}!')
             if not client.scored_gta_today:
                 gta_warning = ''
                 for player in client.players:
@@ -708,7 +746,7 @@ def main():
                         user = discord.utils.get(client.users, name=player.name)
                         gta_warning += f'{user.mention} '
                 if gta_warning != '':
-                    await client.gta_text_channel.send(f'{gta_warning}, you have one hour left to Guess the Audio!')
+                    await client.gta_text_channel.send(f'{gta_warning}, you have one hour left to Guess the Audio #{client.gta_number}!')
             client.sent_warning = True
 
         if client.midnight_called and hour == 23 and minute == 31:
@@ -732,14 +770,14 @@ def main():
                 if user:
                     gta_shamed += f'{user.mention} '
         if gtg_shamed != '':
-            await client.gtg_text_channel.send(f'SHAME ON {gtg_shamed} FOR NOT ATTEMPTING TO GUESS THE GAME!')
+            await client.gtg_text_channel.send(f'SHAME ON {gtg_shamed} FOR NOT ATTEMPTING TO GUESS THE GAME #{client.gtg_number}!')
             scoreboard = ''
             scoreboardList = client.tally_gtg_scores()
             for line in scoreboardList:
                 scoreboard += line
             await client.gtg_text_channel.send(scoreboard)
         if gta_shamed != '':
-            await client.gta_text_channel.send(f'SHAME ON {gta_shamed} FOR NOT ATTEMPTING TO GUESS THE AUDIO!')
+            await client.gta_text_channel.send(f'SHAME ON {gta_shamed} FOR NOT ATTEMPTING TO GUESS THE AUDIO #{client.gta_number}!')
             scoreboard = ''
             scoreboardList = client.tally_gta_scores()
             for line in scoreboardList:
@@ -765,8 +803,10 @@ def main():
                     gta_everyone += f'{user.mention} '
         client.scored_gtg_today = False
         client.scored_gta_today = False
-        await client.gtg_text_channel.send(f'{gtg_everyone}\nIt\'s time to Guess The Game!\nhttps://guessthe.game/')
-        await client.gta_text_channel.send(f'{gta_everyone}\nIt\'s time to Guess The Audio!\nhttps://guesstheaudio.com/')
+        client.gtg_number += 1
+        client.gta_number += 1
+        await client.gtg_text_channel.send(f'{gtg_everyone}\nIt\'s time to Guess The Game #{client.gtg_number}!\nhttps://guessthe.game/')
+        await client.gta_text_channel.send(f'{gta_everyone}\nIt\'s time to Guess The Audio #{client.gta_number}!\nhttps://guesstheaudio.com/')
 
 
     client.run(discord_token)
