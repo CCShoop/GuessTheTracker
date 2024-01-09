@@ -114,6 +114,9 @@ def main():
                         print(f'{get_log_time()}> Got scored_gtg_today as {self.scored_gtg_today}')
                         print(f'{get_log_time()}> Got scored_gta_today as {self.scored_gta_today}')
                     else:
+                        for player in self.players:
+                            if firstField == player.name:
+                                continue
                         load_player = self.Player(firstField)
                         load_player.gtgame.winCount = secondField['gtgame']['winCount']
                         load_player.gtgame.guesses = secondField['gtgame']['guesses']
