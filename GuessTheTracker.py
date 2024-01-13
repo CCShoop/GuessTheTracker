@@ -76,6 +76,7 @@ def main():
                 self.completedToday = False
                 self.succeededToday = False
                 self.filePath = ''
+                self.messageContent = ''
 
         class Player:
             '''Player class for storing player info'''
@@ -193,12 +194,13 @@ def main():
             await client.gtg_text_channel.send(scoreboard)
             for player in client.players:
                 if player.gtgame.registered and player.gtgame.filePath != '':
-                    await client.gtg_text_channel.send(content=f'__{player.name}:__', file=File(player.gtgame.filePath))
+                    await client.gtg_text_channel.send(content=f'__{player.name}:__\n{player.gtgame.messageContent}', file=File(player.gtgame.filePath))
                     try:
                         os.remove(player.gtgame.filePath)
                     except OSError as e:
                         print(f'Error deleting {player.gtgame.filePath}: {e}')
                     player.gtgame.filePath = ''
+                    player.gtgame.messageContent = ''
 
 
         async def score_gta(self):
@@ -209,12 +211,13 @@ def main():
             await client.gta_text_channel.send(scoreboard)
             for player in client.players:
                 if player.gtaudio.registered and player.gtaudio.filePath != '':
-                    await client.gta_text_channel.send(content=f'__{player.name}:__', file=File(player.gtaudio.filePath))
+                    await client.gta_text_channel.send(content=f'__{player.name}:__\n{player.gtaudio.messageContent}', file=File(player.gtaudio.filePath))
                     try:
                         os.remove(player.gtaudio.filePath)
                     except OSError as e:
                         print(f'Error deleting {player.gtaudio.filePath}: {e}')
                     player.gtaudio.filePath = ''
+                    player.gtaudio.messageContent = ''
 
 
         async def process(self, name, message: Message, channel: TextChannel, guessThe: GuessThe):
@@ -517,6 +520,7 @@ def main():
                     if player.gtgame.filePath == '':
                         await message.delete()
                         player.gtgame.filePath = f'{message.author.name}_gtg.png'
+                        player.gtgame.messageContent = message.content
                         with open(player.gtgame.filePath, 'wb') as file:
                             await message.attachments[0].save(file)
                         await message.channel.send(f'Received GTG image from {message.author.name}. It will be sent after scoring.\n')
@@ -527,6 +531,7 @@ def main():
                     if player.gtaudio.filePath == '':
                         await message.delete()
                         player.gtaudio.filePath = f'{message.author.name}_gta.png'
+                        player.gtaudio.messageContent = message.content
                         with open(player.gtaudio.filePath, 'wb') as file:
                             await message.attachments[0].save(file)
                         await message.channel.send(f'Received GTA image from {message.author.name}. It will be sent after scoring.\n')
