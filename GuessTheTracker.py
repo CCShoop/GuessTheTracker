@@ -289,13 +289,19 @@ def main():
             gtgPlayers.sort(key=get_gtg_guesses)
 
             # generate winners list
-            if gtgPlayers[0].gtgame.succeededToday:
-                winningGuessCount = gtgPlayers[0].gtgame.guesses
+            if gtgPlayers[0].gtgame.guesses == 6:
                 for gtgPlayer in gtgPlayers.copy():
-                    if gtgPlayer.gtgame.guesses == winningGuessCount and gtgPlayer.gtgame.succeededToday:
-                        print(f'{get_log_time()}> GTG> {gtgPlayer.name} won with {winningGuessCount} guesses')
+                    if gtgPlayer.gtgame.succeededToday:
                         winners.append(gtgPlayer)
                         gtgPlayers.remove(gtgPlayer)
+            else:
+                if gtgPlayers[0].gtgame.succeededToday:
+                    winningGuessCount = gtgPlayers[0].gtgame.guesses
+                    for gtgPlayer in gtgPlayers.copy():
+                        if gtgPlayer.gtgame.guesses == winningGuessCount and gtgPlayer.gtgame.succeededToday:
+                            print(f'{get_log_time()}> GTG> {gtgPlayer.name} won with {winningGuessCount} guesses')
+                            winners.append(gtgPlayer)
+                            gtgPlayers.remove(gtgPlayer)
 
             # generate completers and losers lists
             for gtgPlayer in gtgPlayers.copy():
@@ -373,13 +379,19 @@ def main():
             gtaPlayers.sort(key=get_gta_guesses)
 
             # generate winners list
-            if gtaPlayers[0].gtaudio.succeededToday:
-                winningGuessCount = gtaPlayers[0].gtaudio.guesses
+            if gtaPlayers[0].gtaudio.guesses == 6:
                 for gtaPlayer in gtaPlayers.copy():
-                    if gtaPlayer.gtaudio.guesses == winningGuessCount and gtaPlayer.gtaudio.succeededToday:
-                        print(f'{get_log_time()}> GTA> {gtaPlayer.name} won with {winningGuessCount} guesses')
+                    if gtaPlayer.gtaudio.succeededToday:
                         winners.append(gtaPlayer)
                         gtaPlayers.remove(gtaPlayer)
+            else:
+                if gtaPlayers[0].gtaudio.succeededToday:
+                    winningGuessCount = gtaPlayers[0].gtaudio.guesses
+                    for gtaPlayer in gtaPlayers.copy():
+                        if gtaPlayer.gtaudio.guesses == winningGuessCount and gtaPlayer.gtaudio.succeededToday:
+                            print(f'{get_log_time()}> GTA> {gtaPlayer.name} won with {winningGuessCount} guesses')
+                            winners.append(gtaPlayer)
+                            gtaPlayers.remove(gtaPlayer)
 
             # generate completers and losers lists
             for gtaPlayer in gtaPlayers.copy():
