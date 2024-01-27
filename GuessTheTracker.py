@@ -115,27 +115,30 @@ def main():
                         print(f'{get_log_time()}> Got scored_gtg_today as {self.scored_gtg_today}')
                         print(f'{get_log_time()}> Got scored_gta_today as {self.scored_gta_today}')
                     else:
+                        player_exists = False
                         for player in self.players:
                             if firstField == player.name:
-                                continue
-                        load_player = self.Player(firstField)
-                        load_player.gtgame.winCount = secondField['gtgame']['winCount']
-                        load_player.gtgame.guesses = secondField['gtgame']['guesses']
-                        load_player.gtgame.registered = secondField['gtgame']['registered']
-                        load_player.gtgame.completedToday = secondField['gtgame']['completedToday']
-                        load_player.gtgame.succeededToday = secondField['gtgame']['succeededToday']
-                        load_player.gtaudio.winCount = secondField['gtaudio']['winCount']
-                        load_player.gtaudio.guesses = secondField['gtaudio']['guesses']
-                        load_player.gtaudio.registered = secondField['gtaudio']['registered']
-                        load_player.gtaudio.completedToday = secondField['gtaudio']['completedToday']
-                        load_player.gtaudio.succeededToday = secondField['gtaudio']['succeededToday']
-                        self.players.append(load_player)
-                        print(f'{get_log_time()}> Loaded player {load_player.name}\n'
-                              f'\t\t\tGTG/GTA wins:       {load_player.gtgame.winCount}/{load_player.gtaudio.winCount}\n'
-                              f'\t\t\tGTG/GTA guesses:    {load_player.gtgame.guesses}/{load_player.gtaudio.guesses}\n'
-                              f'\t\t\tGTG/GTA registered: {load_player.gtgame.registered}/{load_player.gtaudio.registered}\n'
-                              f'\t\t\tGTG/GTA completed:  {load_player.gtgame.completedToday}/{load_player.gtaudio.completedToday}\n'
-                              f'\t\t\tGTG/GTA succeeded:  {load_player.gtgame.succeededToday}/{load_player.gtaudio.succeededToday}')
+                                player_exists = True
+                                break
+                        if not player_exists:
+                            load_player = self.Player(firstField)
+                            load_player.gtgame.winCount = secondField['gtgame']['winCount']
+                            load_player.gtgame.guesses = secondField['gtgame']['guesses']
+                            load_player.gtgame.registered = secondField['gtgame']['registered']
+                            load_player.gtgame.completedToday = secondField['gtgame']['completedToday']
+                            load_player.gtgame.succeededToday = secondField['gtgame']['succeededToday']
+                            load_player.gtaudio.winCount = secondField['gtaudio']['winCount']
+                            load_player.gtaudio.guesses = secondField['gtaudio']['guesses']
+                            load_player.gtaudio.registered = secondField['gtaudio']['registered']
+                            load_player.gtaudio.completedToday = secondField['gtaudio']['completedToday']
+                            load_player.gtaudio.succeededToday = secondField['gtaudio']['succeededToday']
+                            self.players.append(load_player)
+                            print(f'{get_log_time()}> Loaded player {load_player.name}\n'
+                                f'\t\t\tGTG/GTA wins:       {load_player.gtgame.winCount}/{load_player.gtaudio.winCount}\n'
+                                f'\t\t\tGTG/GTA guesses:    {load_player.gtgame.guesses}/{load_player.gtaudio.guesses}\n'
+                                f'\t\t\tGTG/GTA registered: {load_player.gtgame.registered}/{load_player.gtaudio.registered}\n'
+                                f'\t\t\tGTG/GTA completed:  {load_player.gtgame.completedToday}/{load_player.gtaudio.completedToday}\n'
+                                f'\t\t\tGTG/GTA succeeded:  {load_player.gtgame.succeededToday}/{load_player.gtaudio.succeededToday}')
 
                 print(f'{get_log_time()}> Successfully loaded {self.FILE_PATH}')
 
