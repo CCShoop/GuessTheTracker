@@ -794,9 +794,9 @@ def main():
             return
 
         hour, minute = get_time()
-        if hour == 22 and minute == 31 and client.sent_warning:
+        if hour == 22 and minute == 1 and client.sent_warning:
             client.sent_warning = False
-        if hour == 22 and minute == 30 and not client.sent_warning:
+        if hour == 22 and minute == 0 and not client.sent_warning:
             if not client.scored_gtg_today:
                 gtg_warning = ''
                 for player in client.players:
@@ -815,10 +815,10 @@ def main():
                     await client.gta_text_channel.send(f'{gta_warning}, you have one hour left to Guess the Audio #{client.gta_number}!')
             client.sent_warning = True
 
-        if client.midnight_called and hour == 23 and minute == 31:
+        if client.midnight_called and hour == 23 and minute == 1:
             client.midnight_called = False
             client.write_json_file()
-        if client.midnight_called or hour != 23 or minute != 30:
+        if client.midnight_called or hour != 23 or minute != 0:
             return
         client.midnight_called = True
 
